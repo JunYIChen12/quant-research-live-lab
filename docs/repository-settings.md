@@ -9,3 +9,5 @@ Configure after the first push:
 - Enable Dependabot alerts, secret scanning, push protection and CodeQL default setup.
 - Enable Private Vulnerability Reporting.
 - Prevent GitHub Actions from creating or approving Pull Requests unless a reviewed workflow explicitly needs it.
+- Add tag rulesets that prevent update or deletion of candidate-v* and live-v*.
+- Create the release-approved label; apply it manually only after the release decision.

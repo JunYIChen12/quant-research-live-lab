@@ -7,6 +7,8 @@ future adapter must satisfy before opening a position.
 from dataclasses import dataclass
 from decimal import Decimal
 
+from .release import ReleaseVerification
+
 
 @dataclass(frozen=True, slots=True)
 class RiskLimits:
@@ -29,9 +31,6 @@ class RuntimeSnapshot:
     estimated_close_cost: Decimal
     weekly_loss_pct: Decimal
     drawdown_pct: Decimal
-    strategy_commit: str | None
-    approval_id: str | None
-    evidence_complete: bool
     account_reconciled: bool
     stop_orders_healthy: bool
 
@@ -50,7 +49,11 @@ class GateDecision:
     violations: tuple[str, ...]
 
 
-def evaluate_runtime_gate(snapshot: RuntimeSnapshot, limits: RiskLimits) -> GateDecision:
+def evaluate_runtime_gate(
+    snapshot: RuntimeSnapshot,
+    limits: RiskLimits,
+    release: ReleaseVerification,
+) -> GateDecision:
     """Evaluate all known constraints; any missing or invalid state blocks opening."""
     violations: list[str] = []
 
@@ -66,12 +69,8 @@ def evaluate_runtime_gate(snapshot: RuntimeSnapshot, limits: RiskLimits) -> Gate
         violations.append("weekly_loss_limit_reached")
     if snapshot.drawdown_pct >= limits.max_drawdown_pct:
         violations.append("drawdown_limit_reached")
-    if not snapshot.strategy_commit or len(snapshot.strategy_commit) != 40:
-        violations.append("strategy_not_frozen")
-    if not snapshot.approval_id:
-        violations.append("human_approval_missing")
-    if not snapshot.evidence_complete:
-        violations.append("evidence_incomplete")
+    if not release.allowed:
+        violations.extend(f"release:{violation}" for violation in release.violations)
     if not snapshot.account_reconciled:
         violations.append("account_not_reconciled")
     if not snapshot.stop_orders_healthy:
