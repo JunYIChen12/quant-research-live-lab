@@ -15,6 +15,7 @@ from pathlib import Path
 
 SHA1_RE = re.compile(r"^[0-9a-f]{40}$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+TAG_MANIFEST_RE = re.compile(r"(?m)^release-manifest-sha256=([0-9a-f]{64})$")
 REPOSITORY_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 TAG_PATTERNS = {
     "dry-run": re.compile(r"^candidate-v\d+\.\d+\.\d+$"),
@@ -129,6 +130,18 @@ def verify_release(
         violations.append("tag_target_mismatch")
     if tag_type != "tag":
         violations.append("tag_not_annotated")
+    else:
+        tag_contents = _git(
+            repository_root,
+            "cat-file",
+            "tag",
+            f"refs/tags/{manifest.release_tag}",
+        )
+        manifest_hashes = TAG_MANIFEST_RE.findall(tag_contents or "")
+        if len(manifest_hashes) != 1:
+            violations.append("tag_manifest_hash_missing")
+        elif manifest_hashes[0] != _sha256(manifest_path):
+            violations.append("manifest_hash_mismatch")
 
     named_artifacts = (
         ("strategy", manifest.strategy),

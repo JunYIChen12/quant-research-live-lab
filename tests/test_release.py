@@ -35,7 +35,6 @@ def _release_fixture(tmp_path: Path) -> tuple[Path, Path, Path, str]:
     _run(repository, "add", "tracked.txt")
     _run(repository, "commit", "-m", "frozen release")
     commit_sha = _run(repository, "rev-parse", "HEAD")
-    _run(repository, "tag", "-a", "candidate-v0.1.0", "-m", "candidate-v0.1.0")
 
     strategy = artifacts / "strategy.py"
     risk_config = artifacts / "risk.toml"
@@ -73,6 +72,14 @@ def _release_fixture(tmp_path: Path) -> tuple[Path, Path, Path, str]:
         ),
         encoding="utf-8",
     )
+    _run(
+        repository,
+        "tag",
+        "-a",
+        "candidate-v0.1.0",
+        "-m",
+        f"release-manifest-sha256={_sha256(manifest)}",
+    )
     return repository, artifacts, manifest, commit_sha
 
 
@@ -107,6 +114,29 @@ def test_modified_strategy_is_rejected(tmp_path: Path) -> None:
 
     assert result.allowed is False
     assert "strategy_hash_mismatch" in result.violations
+
+
+def test_manifest_and_artifact_tampering_after_tag_is_rejected(tmp_path: Path) -> None:
+    repository, artifacts, manifest, _ = _release_fixture(tmp_path)
+    strategy = artifacts / "strategy.py"
+    approved_hash = _sha256(strategy)
+    strategy.write_text("tampered\n", encoding="utf-8")
+    manifest.write_text(
+        manifest.read_text(encoding="utf-8").replace(approved_hash, _sha256(strategy)),
+        encoding="utf-8",
+    )
+
+    result = verify_release(
+        repository_root=repository,
+        artifact_root=artifacts,
+        manifest_path=manifest,
+        requested_mode="dry-run",
+        expected_repository="JunYIChen12/quant-research-live-lab",
+        approval_verifier=lambda _: True,
+    )
+
+    assert result.allowed is False
+    assert "manifest_hash_mismatch" in result.violations
 
 
 def test_missing_real_approval_verifier_is_rejected(tmp_path: Path) -> None:

@@ -7,11 +7,11 @@ Merging a Pull Request does not authorize dry-run or live execution.
 A runnable release consists of four matching objects:
 
 1. A commit merged into main through the recorded Pull Request.
-2. An annotated Git tag pointing at that exact commit.
+2. An annotated Git tag pointing at that exact commit and recording the release manifest SHA-256.
 3. An external machine-readable release manifest deployed beside the artifacts.
 4. The strategy, risk configuration and evidence bundle named in the manifest.
 
-The manifest is generated after merge so it can contain the final commit SHA. It is a deployment artifact and must not be edited in place. Real manifests are ignored by Git; only the example is committed.
+The manifest is generated after merge so it can contain the final commit SHA. It is a deployment artifact and must not be edited in place. Real manifests are ignored by Git; only the example is committed. The annotated tag message must contain exactly one `release-manifest-sha256=<digest>` line so replacing the external manifest invalidates the release.
 
 ## Naming
 
@@ -37,6 +37,7 @@ Verification fails closed when:
 - HEAD differs from the approved commit.
 - Tracked files are dirty.
 - The annotated tag is missing, malformed or points elsewhere.
+- The annotated tag does not contain the deployed manifest SHA-256, or the manifest was replaced after tagging.
 - Requested mode differs from the manifest mode.
 - Any artifact is missing, outside the artifact root or has a different SHA-256.
 - The manifest repository differs from the trusted repository configured by the runtime.
