@@ -84,6 +84,7 @@ def test_matching_frozen_release_is_allowed(tmp_path: Path) -> None:
         artifact_root=artifacts,
         manifest_path=manifest,
         requested_mode="dry-run",
+        expected_repository="JunYIChen12/quant-research-live-lab",
         approval_verifier=lambda release: release.approved_commit_sha == commit_sha,
     )
 
@@ -100,6 +101,7 @@ def test_modified_strategy_is_rejected(tmp_path: Path) -> None:
         artifact_root=artifacts,
         manifest_path=manifest,
         requested_mode="dry-run",
+        expected_repository="JunYIChen12/quant-research-live-lab",
         approval_verifier=lambda _: True,
     )
 
@@ -115,6 +117,7 @@ def test_missing_real_approval_verifier_is_rejected(tmp_path: Path) -> None:
         artifact_root=artifacts,
         manifest_path=manifest,
         requested_mode="dry-run",
+        expected_repository="JunYIChen12/quant-research-live-lab",
         approval_verifier=None,
     )
 
@@ -130,6 +133,7 @@ def test_wrong_execution_mode_is_rejected(tmp_path: Path) -> None:
         artifact_root=artifacts,
         manifest_path=manifest,
         requested_mode="live",
+        expected_repository="JunYIChen12/quant-research-live-lab",
         approval_verifier=lambda _: True,
     )
 
@@ -149,12 +153,29 @@ def test_commit_mismatch_is_rejected(tmp_path: Path) -> None:
         artifact_root=artifacts,
         manifest_path=manifest,
         requested_mode="dry-run",
+        expected_repository="JunYIChen12/quant-research-live-lab",
         approval_verifier=lambda _: True,
     )
 
     assert result.allowed is False
     assert "commit_mismatch" in result.violations
     assert "tag_target_mismatch" in result.violations
+
+
+def test_manifest_cannot_redirect_approval_to_another_repository(tmp_path: Path) -> None:
+    repository, artifacts, manifest, _ = _release_fixture(tmp_path)
+
+    result = verify_release(
+        repository_root=repository,
+        artifact_root=artifacts,
+        manifest_path=manifest,
+        requested_mode="dry-run",
+        expected_repository="trusted-owner/trusted-repository",
+        approval_verifier=lambda _: True,
+    )
+
+    assert result.allowed is False
+    assert "repository_mismatch" in result.violations
 
 
 def test_github_approval_requires_merged_main_commit_and_label(

@@ -81,6 +81,7 @@ def verify_release(
     artifact_root: Path,
     manifest_path: Path,
     requested_mode: str,
+    expected_repository: str,
     approval_verifier: ApprovalVerifier | None,
 ) -> ReleaseVerification:
     """Fail closed unless Git state, tags, artifacts and approval all match."""
@@ -104,6 +105,8 @@ def verify_release(
         violations.append("approval_label_invalid")
     if not REPOSITORY_RE.fullmatch(manifest.repository):
         violations.append("repository_invalid")
+    if manifest.repository != expected_repository:
+        violations.append("repository_mismatch")
     if manifest.release_id != manifest.release_tag:
         violations.append("release_identity_mismatch")
 
@@ -114,7 +117,10 @@ def verify_release(
     head = _git(repository_root, "rev-parse", "HEAD")
     if head is None or head != manifest.approved_commit_sha:
         violations.append("commit_mismatch")
-    if _git(repository_root, "status", "--porcelain", "--untracked-files=no"):
+    tracked_status = _git(repository_root, "status", "--porcelain", "--untracked-files=no")
+    if tracked_status is None:
+        violations.append("git_status_unavailable")
+    elif tracked_status:
         violations.append("tracked_worktree_dirty")
 
     tag_target = _git(repository_root, "rev-list", "-n", "1", manifest.release_tag)
@@ -124,11 +130,15 @@ def verify_release(
     if tag_type != "tag":
         violations.append("tag_not_annotated")
 
-    for name, artifact in (
+    named_artifacts = (
         ("strategy", manifest.strategy),
         ("risk_config", manifest.risk_config),
         ("evidence_bundle", manifest.evidence_bundle),
-    ):
+    )
+    if len({artifact.path for _, artifact in named_artifacts}) != len(named_artifacts):
+        violations.append("artifact_paths_not_unique")
+
+    for name, artifact in named_artifacts:
         if not SHA256_RE.fullmatch(artifact.sha256):
             violations.append(f"{name}_hash_invalid")
             continue

@@ -39,6 +39,7 @@ Verification fails closed when:
 - The annotated tag is missing, malformed or points elsewhere.
 - Requested mode differs from the manifest mode.
 - Any artifact is missing, outside the artifact root or has a different SHA-256.
+- The manifest repository differs from the trusted repository configured by the runtime.
 - The approval Pull Request is not merged into main at the approved commit.
 - The release-approved label is missing or the GitHub check cannot be completed.
 
