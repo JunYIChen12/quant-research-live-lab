@@ -1,0 +1,23 @@
+name: Change proposal
+description: 提议功能、策略研究或风险规则变更。
+title: "[Proposal]: "
+labels: ["proposal"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 问题与证据
+    validations:
+      required: true
+  - type: textarea
+    id: change
+    attributes:
+      label: 建议变更
+    validations:
+      required: true
+  - type: textarea
+    id: risk
+    attributes:
+      label: 风险、失败方式与回滚
+    validations:
+      required: true

@@ -1,0 +1,7 @@
+# Example only. A live configuration requires a frozen commit and explicit approval.
+max_leverage = "1"
+max_open_positions = 1
+required_margin_mode = "isolated"
+max_daily_loss_pct = "0.01"
+max_weekly_loss_pct = "0.03"
+max_drawdown_pct = "0.05"

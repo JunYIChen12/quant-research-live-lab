@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security report
+    url: https://github.com/JunYIChen12/quant-research-live-lab/security/advisories/new
+    about: 请私下报告漏洞，不要公开敏感信息。
