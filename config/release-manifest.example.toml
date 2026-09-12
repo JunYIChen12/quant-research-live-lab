@@ -1,0 +1,21 @@
+# Generated after an approved PR is merged. Deploy beside the frozen artifacts.
+schema_version = 1
+release_id = "candidate-v0.1.0"
+execution_mode = "dry-run"
+approved_commit_sha = "0000000000000000000000000000000000000000"
+release_tag = "candidate-v0.1.0"
+repository = "JunYIChen12/quant-research-live-lab"
+approval_pr_number = 1
+approval_label = "release-approved"
+
+[artifacts.strategy]
+path = "strategy.py"
+sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+
+[artifacts.risk_config]
+path = "risk.toml"
+sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+
+[artifacts.evidence_bundle]
+path = "evidence.json"
+sha256 = "0000000000000000000000000000000000000000000000000000000000000000"

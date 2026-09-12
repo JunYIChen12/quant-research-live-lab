@@ -24,6 +24,7 @@ private/
 config/local.*
 config/live.*
 !config/*.example.toml
+release-manifest.toml
 
 # Trading data and artifacts
 *.db
