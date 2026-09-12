@@ -1,0 +1,36 @@
+services:
+  freqtrade-dry-run:
+    build:
+      context: ../..
+      dockerfile: deploy/freqtrade-dry-run/Dockerfile
+    image: quant-research-live-lab/freqtrade:2026.8
+    container_name: freqtrade-dry-run
+    restart: "no"
+    environment:
+      PYTHONPATH: /opt/quant-lab/src
+      QUANT_REPOSITORY_ROOT: /opt/quant-lab
+      QUANT_ARTIFACT_ROOT: /opt/release
+      QUANT_MANIFEST_PATH: /opt/release/release-manifest.toml
+      FREQTRADE__API_SERVER__USERNAME: ${FREQTRADE__API_SERVER__USERNAME:?set API username}
+      FREQTRADE__API_SERVER__PASSWORD: ${FREQTRADE__API_SERVER__PASSWORD:?set API password}
+      FREQTRADE__API_SERVER__JWT_SECRET_KEY: ${FREQTRADE__API_SERVER__JWT_SECRET_KEY:?set JWT secret}
+      FREQTRADE__API_SERVER__WS_TOKEN: ${FREQTRADE__API_SERVER__WS_TOKEN:?set WebSocket token}
+      GIT_CONFIG_COUNT: "1"
+      GIT_CONFIG_KEY_0: safe.directory
+      GIT_CONFIG_VALUE_0: /opt/quant-lab
+    volumes:
+      - ../..:/opt/quant-lab:ro
+      - ${QUANT_RELEASE_DIR:?set QUANT_RELEASE_DIR in .env}:/opt/release:ro
+      - freqtrade_dry_run_data:/freqtrade/user_data
+    ports:
+      - "127.0.0.1:8081:8080"
+    command: >
+      trade
+      --logfile /freqtrade/user_data/freqtrade-dry-run.log
+      --db-url sqlite:////freqtrade/user_data/tradesv3.dry-run.sqlite
+      --config /opt/release/config.dry-run.json
+      --strategy-path /opt/release
+      --strategy GovernedDryRunStrategy
+
+volumes:
+  freqtrade_dry_run_data:
