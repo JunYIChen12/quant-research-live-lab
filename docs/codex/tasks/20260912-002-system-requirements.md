@@ -167,6 +167,25 @@ git ls-remote origin refs/heads/codex/workbench-init refs/heads/main
 git status --short --branch --untracked-files=all
 ```
 
+### Git 推送回执（2026-09-13）
+
+需求主体已提交并推送至 origin/codex/workbench-init。本节是在推送成功并独立读取远程引用后补记的实际证据，不是预期结果；本节自身随后作为文档回执提交同步，不重写前述提交。
+
+| 命令或检查 | 实际结果 |
+| --- | --- |
+| git diff --cached --check；git diff --cached --name-only（需求提交前） | 空白检查退出 0；暂存范围恰为 CURRENT_TASK.md、PROJECT_STATE.md、本任务文件 |
+| 定向暂存差异敏感模式检查；git diff --quiet 对比产品基线和八个保留对象 | PASS；未发现所检查的凭据模式；产品文件未变、八个保留文件未变；不是全账户或全磁盘安全审计 |
+| git commit -m "docs: reconcile confirmed simulation requirements and open decisions" | 成功；3 文件，165 行新增、16 行删除，包含历史标识、当前契约、来源及检查记录 |
+| git rev-parse --verify HEAD（需求主体提交后） | 98233df9c18f9f5625b3ecaea82566accad4a6cd |
+| git diff --check a5fdc77ccb54f5d4d3d704bf4a78cb0166942c28 HEAD | 退出 0 |
+| git push --set-upstream origin HEAD:refs/heads/codex/workbench-init | 退出 0，新建远程工作分支并建立上游跟踪；未强推 |
+| git ls-remote origin refs/heads/codex/workbench-init refs/heads/main（推送后） | 工作分支为 98233df9c18f9f5625b3ecaea82566accad4a6cd，与本地需求提交一致；main 仍为 a5fdc77ccb54f5d4d3d704bf4a78cb0166942c28 |
+| git status --short --branch --untracked-files=all（补写本回执前） | 仅 codex/workbench-init...origin/codex/workbench-init，无未提交或未跟踪文件 |
+
+回执核对方法：`git log -1 --format=%H -- docs/codex/tasks/20260912-002-system-requirements.md` 可定位包含本节的最后提交，再用 `git rev-parse HEAD` 和上述 `git ls-remote` 命令核对最终本地与远程工作分支；本节不填写自身未来的提交号。提交树中的文档及上述需求主体 SHA 是交付证据，不要求依赖对话恢复内容。
+
+未创建或合并 PR；main 未由本次操作更新。没有标签、部署、交易、后台服务、子代理或独立验收。未运行本地业务 pytest/ruff、浏览器渲染或远程 CI/保护核验，均不冒充通过。需求数值、规则冲突和异常细节尚未定稿，当前任务继续 ANALYZING，下一步仍是控制塔与用户细化指标。
+
 ## 2026-09-12 历史记录起点
 
 以下保留上次整理的原始内容、确认编号 R01-R16、未决项、授权边界及检查结果，仅代表 2026-09-12 的快照。其中“本轮”“当前”“未提交”“禁止推送”和 ROI 续聊问题均属当日语境，不覆盖上方 2026-09-13 当前契约及本次 Git 授权。旧条目不删除；以替代对照表理解其效力。
