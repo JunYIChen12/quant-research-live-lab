@@ -2,13 +2,14 @@
 
 ## 已核对基线
 
-- 核对日期：2026-09-12；唯一目录 D:/CodexProjects/projects/quant-research-live-lab。
+- 核对日期：2026-09-13；唯一目录 D:/CodexProjects/projects/quant-research-live-lab。
 - 产品基线：a5fdc77ccb54f5d4d3d704bf4a78cb0166942c28；初始化任务分支 codex/workbench-init。动态状态每次以 Git 与 [当前任务](CURRENT_TASK.md) 重新核对。
-- origin：https://github.com/JunYIChen12/quant-research-live-lab.git；未刷新远程。
+- origin：https://github.com/JunYIChen12/quant-research-live-lab.git；2026-09-13 使用 git ls-remote 核对，默认分支及 main 仍为上述产品基线，写入前远程无 codex/workbench-init 分支。此次只获准推送该工作分支，不直接更新 main。
 - 本次本地工具环境：Windows、PowerShell 7.6.5；没有安装或重建环境。
 - 仓库存在 src/quant_lab/gates.py、release.py 及对应 tests/test_gates.py、test_release.py；这是文件存在证据，不是正确性验收。
 - 工作台初始化于 2026-09-12 经独立验收 ACCEPTED，控制塔复核后关闭 20260912-001；证据见 [任务记录](tasks/20260912-001-workbench-init.md)。仅接受本地文档交接，不代表业务运行或发布通过。
-- 初始化关闭时无活动任务；此项是关闭时快照，后续需求状态以 [当前任务](CURRENT_TASK.md) 为准。文档改动尚未提交、推送或合并，不能把本地关闭当作远程持久化完成。
+- 初始化关闭时无活动任务；此项是历史快照。当前为 20260912-002 / ANALYZING，由 00｜项目控制塔负责；需求、冲突和下一步以 [当前任务](CURRENT_TASK.md) 及任务文件为准。
+- 2026-09-13 已将此前 11 项工作台文档改动原样提交为 78165c8112779701cd3ace8c9cca88c9576a315d；产品基线未改变。后续需求整理及远程持久化结果记录在 [当前任务文件](tasks/20260912-002-system-requirements.md)，不能用本地提交代替推送证据。
 
 ## 静态文档与配置声明
 
@@ -26,4 +27,4 @@ Python、本地依赖、测试结果、CI 实际结果、远程保护、运行�
 
 ## 推断与建议
 
-现有静态材料与独立验收足够接受本地文档工作台，不足以接受业务运行结果。后续需求、未决冲突及责任以 [当前任务](CURRENT_TASK.md) 指向的任务文件为准；讨论记录不扩大原验收范围，不自动开展业务开发或提交变更。
+现有静态材料与独立验收足够接受本地文档工作台，不足以接受业务运行结果。后续需求、未决冲突及责任以 [当前任务](CURRENT_TASK.md) 指向的任务文件为准。2026-09-13 的文档提交与推送授权不扩大原验收范围，不自动开展业务开发；安全冲突解决前仍执行现行规则。
