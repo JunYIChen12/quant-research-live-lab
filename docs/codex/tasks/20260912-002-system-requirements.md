@@ -51,6 +51,14 @@
 
 本次只整理设计文档，因此未运行 pytest、ruff、Freqtrade 命令、Dry-run、Windows 通知、远程 CI 或独立验收；没有安装依赖、启动服务、连接交易所、读取凭据、修改代码或创建子代理。这些跳过项不能被解释为业务检查通过。
 
+### Freqtrade 核心版框架 Git 推送回执
+
+修订框架和任务入口提交为 `b6b614aaa92ee70acbf3cd96a01e7d95b2216179`，提交说明为 `docs: adopt Freqtrade core framework`，只包含三个获准文档，统计为 217 行新增、155 行删除。提交后再次执行 `git fetch origin`；远程工作分支仍指向父提交 `3b0dbbed1174d5ad28ced7aae22cccd5269c7698`，与本次提交父节点一致，因此没有远程分叉。
+
+普通执行 `git push origin HEAD:refs/heads/codex/workbench-init` 成功，远程从 `3b0dbbed1174d5ad28ced7aae22cccd5269c7698` 前进到 `b6b614aaa92ee70acbf3cd96a01e7d95b2216179`。没有强推、更新 `main`、创建或合并 PR、打标签、发布、部署或启动交易服务。
+
+本回执在上述结果确认后单独提交。回执提交自身不预填未来 SHA；可用 `git log -1 --format=%H -- docs/codex/tasks/20260912-002-system-requirements.md` 定位，再与 `git ls-remote origin refs/heads/codex/workbench-init` 核对最终远程。远程持久化只证明第一期设计已保存，不使整个任务达到 `READY`，也不授权业务实施或实盘。
+
 ## 2026-09-14 旧第一期框架确认（历史）
 
 ### 当时结论
