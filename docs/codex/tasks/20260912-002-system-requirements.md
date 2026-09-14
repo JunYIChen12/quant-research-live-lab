@@ -55,6 +55,14 @@
 
 写后检查：三个目标文档均通过严格 UTF-8、末尾换行、行尾空白和冲突标记检查；本地 Markdown 链接全部可解析；框架稿包含目标、模块、数据、状态、权限、冲突、第二期和完成标准，且无 TBD、TODO 或“待补充”占位。git diff --check 退出 0；HEAD 和分支未变；最终改动对象仅为 CURRENT_TASK.md、本任务文件和新增框架稿。定向敏感信息模式搜索无匹配，rg 因零匹配返回 1，按工具语义记录为未发现匹配，不冒充全面安全审计。
 
+### 第一期框架 Git 推送回执（2026-09-14）
+
+第一期框架及任务入口提交为 `6e36d253d582a5a74b43e13b098c19bbff00892b`，提交说明为 `docs: confirm phase one system framework`，只包含 CURRENT_TASK.md、本任务文件和新增框架稿。普通执行 `git push origin codex/workbench-init` 成功，远程从 `eb1c62afdf4e3df10565e9841a4e3f33b5786199` 前进到该提交。
+
+推送后执行 `git ls-remote origin refs/heads/codex/workbench-init`，远程返回与本地 HEAD 相同的完整 SHA；`git rev-list --left-right --count HEAD...origin/codex/workbench-init` 为 `0 0`，工作区当时干净。没有强推、直接更新 main、创建或合并 PR、打标签、发布、部署或启动交易服务。
+
+本回执随后作为独立文档提交再次普通推送。回执提交自身不预填未来 SHA；后续可用 `git log -1 --format=%H -- docs/codex/tasks/20260912-002-system-requirements.md` 定位，再与 `git ls-remote` 核对最终工作分支。远程持久化只证明文档已保存，不使任务达到 READY，也不授权实现或实盘。
+
 ## 2026-09-14 旧总路线与 Freqtrade 对照（历史输入）
 
 以下内容记录第一期框架确认前的七阶段路线、静态源码对照和 PR #7 审查证据。事实证据继续有效，但其中“修复 PR #7 后进入下一阶段”的顺序已被上方框架确认取代，不得作为当前实施授权。
