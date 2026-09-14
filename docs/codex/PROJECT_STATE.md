@@ -3,14 +3,15 @@
 ## 已核对基线
 
 - 核对日期：2026-09-13；唯一目录 D:/CodexProjects/projects/quant-research-live-lab。
-- 产品基线：a5fdc77ccb54f5d4d3d704bf4a78cb0166942c28；初始化任务分支 codex/workbench-init。动态状态每次以 Git 与 [当前任务](CURRENT_TASK.md) 重新核对。
+- 原产品基线：a5fdc77ccb54f5d4d3d704bf4a78cb0166942c28；2026-09-14 远程 Git 治理后 `main` 当前为 `0abdd4a741dadb59b51daf17bd346832ee0a6545`；初始化任务分支为 `codex/workbench-init`。动态状态每次以 Git 与 [当前任务](CURRENT_TASK.md) 重新核对。
 - origin：https://github.com/JunYIChen12/quant-research-live-lab.git；2026-09-13 使用 git ls-remote 核对，默认分支及 main 仍为上述产品基线，写入前远程无 codex/workbench-init 分支。此次只获准推送该工作分支，不直接更新 main。
 - 本次本地工具环境：Windows、PowerShell 7.6.5；没有安装或重建环境。
 - 仓库存在 src/quant_lab/gates.py、release.py 及对应 tests/test_gates.py、test_release.py；这是文件存在证据，不是正确性验收。
 - 工作台初始化于 2026-09-12 经独立验收 ACCEPTED，控制塔复核后关闭 20260912-001；证据见 [任务记录](tasks/20260912-001-workbench-init.md)。仅接受本地文档交接，不代表业务运行或发布通过。
-- 初始化关闭时无活动任务；此项是历史快照。当前为 20260914-003 / IN_PROGRESS，由 00｜项目控制塔负责；远程治理完成后恢复 20260912-002 / ANALYZING。动态任务、冲突和下一步以 [当前任务](CURRENT_TASK.md) 及任务文件为准。
+- 初始化关闭时无活动任务；此项是历史快照。当前为 20260912-002 / ANALYZING，由 00｜项目控制塔负责；远程治理任务 20260914-003 已完成并关闭。动态任务、冲突和下一步以 [当前任务](CURRENT_TASK.md) 及任务文件为准。
 - 2026-09-13 已将此前 11 项工作台文档改动原样提交为 78165c8112779701cd3ace8c9cca88c9576a315d；产品基线未改变。后续需求整理及远程持久化结果记录在 [当前任务文件](tasks/20260912-002-system-requirements.md)，不能用本地提交代替推送证据。
 - 2026-09-14 远程 Git 治理任务已获用户确认，清理范围、保留项和远程核对标准记录在 [治理任务文件](tasks/20260914-003-remote-git-governance.md)；执行中不改写历史、不删除项目源代码或安全发布规则。
+- 2026-09-14 远程 Git 治理已完成：远程仅保留 `main`、`codex/workbench-init` 和 `integration/freqtrade-dry-run`；Dependabot 配置已从 `main` 移除，项目源代码、测试和安全/发布文档保留。详细证据见治理任务文件。
 
 ## 静态文档与配置声明
 

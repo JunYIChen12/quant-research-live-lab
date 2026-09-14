@@ -3,7 +3,7 @@
 ## 身份与基线
 
 - 创建日期：2026-09-14，Asia/Shanghai。
-- 状态：IN_PROGRESS。
+- 状态：CLOSED。
 - 当前责任线程：00｜项目控制塔。
 - 分析、执行和核对由当前控制塔在同一目标根目录完成；执行后只读核对远程状态。未创建子代理。
 - 唯一根目录：D:/CodexProjects/projects/quant-research-live-lab。
@@ -102,6 +102,24 @@
 
 2026-09-14 用户确认按推荐方案执行，包括关闭三个 Dependabot PR、删除确认的远程分支和停用 Dependabot 自动 PR。该确认不扩大到删除项目代码、改写历史、关闭 PR `#7` 或修改产品安全规则。
 
-### 尚未执行
+### 执行结果（2026-09-14）
 
-登记提交和远程治理动作尚未开始；完成前不得将本任务标记为 ACCEPTED 或 CLOSED。
+- 任务登记提交：`d2a2a9053eff64073fdb766bdc8e56c95da24545`，已普通推送到 `origin/codex/workbench-init`；本地与远程一致，领先/落后 `0/0`。
+- PR `#1`、`#2`、`#3` 已关闭。关闭后 GitHub 自动删除了三个对应的 Dependabot 分支；随后一次批量删除命令因远程引用已不存在而返回失败，未影响其他分支。
+- `governance/release-integrity-gate` 已单独删除；删除前确认其对应 PR `#5` 已合并。
+- 一次性治理分支 `governance/remote-noise-cleanup-20260914` 从 `main` 创建，先后提交 `db665f7bc8eea30c020431d43f84b2334de0a924` 和 `b6ec2cd3431c18b2d4f53648471332291f4d111b`，PR `#8` 已 squash 合并为 `0abdd4a741dadb59b51daf17bd346832ee0a6545`；随后一次性分支已删除。
+- PR `#8` 合并前 CI `run #10` 为 completed/success；合并前比较结果仅包含删除 `.github/dependabot.yml` 和新增 `CHANGELOG.md`。
+- 读取 `main` 分支保护详情的 API 返回 403；未绕过保护，改用最小 PR 流程完成合并。
+
+### 验收结果（2026-09-14）
+
+- 远程分支复核：仅剩 `main`（`0abdd4a741dadb59b51daf17bd346832ee0a6545`）、`codex/workbench-init`（`d2a2a9053eff64073fdb766bdc8e56c95da24545`）和 `integration/freqtrade-dry-run`（`8d1037fe317ebfddbc3f70b5b306a73ac4681036`）。
+- PR 状态复核：`#1/#2/#3` closed，`#5` merged，`#7` open，`#8` merged；Issue `#6` 保留。
+- `main` 文件树复核：`.github/dependabot.yml` 不存在，`CHANGELOG.md` 存在；`src/quant_lab/gates.py`、`src/quant_lab/release.py`、两份测试、安全文档和发布文档均保留。
+- `main` 相对治理前的唯一变更是上述两个文件；没有删除项目源代码、测试、安全模型、发布政策或需求资料。
+- 本地复核：当前分支仍为 `codex/workbench-init`，工作区干净；`CURRENT_TASK.md` 已恢复指向 `20260912-002 / ANALYZING`。
+- 未执行业务 pytest/ruff、交易服务、交易所连接或真实账户检查；本任务是远程 Git 治理，不把这些不相关检查冒充验收证据。
+
+### 关闭结论
+
+验收标准全部满足，治理任务于 2026-09-14 关闭。原需求任务 `20260912-002` 恢复为当前任务并继续 `ANALYZING`；本次治理不代表业务实现、需求 READY、模拟交易可用或实盘授权。

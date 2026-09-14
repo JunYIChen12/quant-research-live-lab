@@ -4,4 +4,4 @@
 | --- | --- | --- | --- |
 | 20260912-001 | 项目工作台初始化 | CLOSED | [任务](tasks/20260912-001-workbench-init.md) |
 | 20260912-002 | 系统需求与模块边界梳理 | ANALYZING | [任务](tasks/20260912-002-system-requirements.md) |
-| 20260914-003 | 远程 Git 仓库治理 | IN_PROGRESS | [任务](tasks/20260914-003-remote-git-governance.md) |
+| 20260914-003 | 远程 Git 仓库治理 | CLOSED | [任务](tasks/20260914-003-remote-git-governance.md) |
