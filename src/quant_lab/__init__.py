@@ -1,5 +1,6 @@
 """Safety-first primitives for the quant research live lab."""
 
+from .freqtrade_gate import ReleaseGate
 from .gates import GateDecision, RiskLimits, RuntimeSnapshot, evaluate_runtime_gate
 from .release import (
     GitHubApprovalVerifier,
@@ -13,6 +14,7 @@ __all__ = [
     "GateDecision",
     "GitHubApprovalVerifier",
     "ReleaseManifest",
+    "ReleaseGate",
     "ReleaseVerification",
     "RiskLimits",
     "RuntimeSnapshot",
