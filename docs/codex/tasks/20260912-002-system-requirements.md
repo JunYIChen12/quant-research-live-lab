@@ -88,6 +88,15 @@
 
 未执行业务 pytest/ruff、模拟运行、Windows 运行测试、远程 CI 或独立验收；这些不在计划同步范围内。回退需另获授权后使用审阅过的反向补丁或新 revert 提交，不重写已推送历史。任务继续 ANALYZING，下一步仍由控制塔开展第 1 步讨论。
 
+### 计划同步回执（2026-09-14）
+
+- git diff --cached --check 退出 0；暂存白名单恰为 CURRENT_TASK.md 与本任务文件，未暂存改动为空。提交前复查文档结构、链接、状态、原契约字节保留及新增差异凭据模式，结果同上。
+- git commit -m "docs: persist agreed roadmap and simulation planning steps" 成功；2 文件，72 行新增、6 行删除。git rev-parse --verify HEAD 返回 a94905146dbe9fcbc83489ecf761e72052494e6a。
+- git push origin HEAD:refs/heads/codex/workbench-init 退出 0，从 60abb777 推进到上述计划提交，无强推。
+- 随后 git ls-remote origin refs/heads/codex/workbench-init refs/heads/main 退出 0：工作分支为 a94905146dbe9fcbc83489ecf761e72052494e6a，与本地一致；main 保持 a5fdc77ccb54f5d4d3d704bf4a78cb0166942c28。git status --short --branch --untracked-files=all 显示跟踪一致且无未提交或未跟踪文件。
+
+本回执在上述结果确认后补写，随后单独提交、同步，不改写已推送历史。可用 git log -1 --format=%H -- docs/codex/tasks/20260912-002-system-requirements.md 定位含本回执的最后提交，再对照 git rev-parse HEAD 与 git ls-remote 核对最终分支；不预填本回执自身未来的 SHA。计划文件已远程持久化，不等于需求定稿、主分支合并、业务实施或独立验收，当前任务与责任保持不变。
+
 ## 2026-09-13 当前契约
 
 ### 目标、授权与证据等级
