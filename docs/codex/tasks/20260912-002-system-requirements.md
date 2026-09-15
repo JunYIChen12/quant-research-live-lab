@@ -59,6 +59,10 @@
 
 本回执在上述结果确认后单独提交。回执提交自身不预填未来 SHA；可用 `git log -1 --format=%H -- docs/codex/tasks/20260912-002-system-requirements.md` 定位，再与 `git ls-remote origin refs/heads/codex/workbench-init` 核对最终远程。远程持久化只证明第一期设计已保存，不使整个任务达到 `READY`，也不授权业务实施或实盘。
 
+回执提交为 `e3a1b094a4de0b750b22ca656b9f8a240d2de2e1` 并已普通推送。首次最终核对已观察到本地、`ls-remote` 和跟踪分支均为该 SHA、领先/落后原始输出为 `0<TAB>0`、工作区条目为 0，但脚本误将带制表符的单字符串与空格字符串比较，随后抛出 `divergence remains`；这是断言解析错误，没有修改仓库或远程，不能省略为成功。
+
+改为按空白拆分并逐列数值比较后重跑通过：本地、远程和跟踪分支均为 `e3a1b094a4de0b750b22ca656b9f8a240d2de2e1`，ahead 0、behind 0、工作区条目 0，`git diff --check` 退出 0。该结果发生在补写本段前；本段继续使用独立普通提交保存，不改写已推送历史。
+
 ## 2026-09-14 旧第一期框架确认（历史）
 
 ### 当时结论
