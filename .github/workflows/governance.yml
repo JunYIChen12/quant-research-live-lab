@@ -6,7 +6,7 @@ on:
   issue_comment:
     types: [created, edited, deleted]
   pull_request:
-    types: [opened, edited, synchronize, reopened, ready_for_review, converted_to_draft]
+    types: [opened, edited, synchronize, reopened, ready_for_review, converted_to_draft, closed]
   pull_request_review:
     types: [submitted, edited, dismissed]
 
@@ -48,7 +48,7 @@ jobs:
     if: >-
       github.event_name == 'issue_comment' &&
       github.event.issue.pull_request == null &&
-      startsWith(github.event.comment.body, '/verify PASS ')
+      startsWith(github.event.comment.body, '/verify ')
     runs-on: ubuntu-latest
     permissions:
       contents: read

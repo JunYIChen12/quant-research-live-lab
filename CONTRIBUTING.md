@@ -7,7 +7,7 @@
 3. Issue 达到 `READY` 后，从 main 创建包含 Issue 编号的短生命周期分支。
 4. 小步提交，提交信息说明意图；开发阶段可以创建 Draft Pull Request。
 5. 运行 ruff check . 与 pytest。
-6. 独立验收后在 Issue 记录 `/verify PASS <完整 HEAD SHA>`，再进入 `ACCEPTED`；新提交会使旧验收失效。
+6. 默认由可信协作者在 Issue 记录 `/verify PASS <完整 HEAD SHA>`，再进入 `ACCEPTED`；个人仓库只有在明确采用 solo 模式时，才由仓库所有者记录 `/verify SOLO PASS <完整 HEAD SHA> EVIDENCE <可复核引用>`。引用只允许当前仓库的 GitHub `issues`、`pull`、`commit` 或 `blob` 路径，或完整的 `codex://review?pr=<URL编码的当前PR URL>&path=<仓库相对路径>&line=<正整数>&side=left|right`。solo 记录是 owner attestation，不是另一位人工审核者；机器人、普通说明和实施线程自评不能代替结构化证据。新提交会使旧验收失效。
 7. 通过 Pull Request 合并；不要直接修改受保护的 main。
 
 拼写修正、小型文档调整和 Dependabot 更新可以不建 Issue，但仍须通过 Pull Request。
