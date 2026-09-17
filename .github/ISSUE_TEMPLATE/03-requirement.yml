@@ -1,0 +1,43 @@
+name: Requirement or governed change
+description: 登记需要分析、实施或正式验收的需求和治理变更。
+title: "[Requirement]: "
+labels: ["type:change", "status:draft"]
+body:
+  - type: markdown
+    attributes:
+      value: "一个 Issue 只包含一个主要目标。不要填写凭据、账户资料或原始交易日志。"
+  - type: textarea
+    id: goal
+    attributes:
+      label: 目标
+      description: 完成后希望观察到什么变化？
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: 范围
+      description: 本次包含哪些工作？
+    validations:
+      required: true
+  - type: textarea
+    id: excluded
+    attributes:
+      label: 不在范围
+      description: 明确本次不会顺便处理什么。
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 验收标准
+      description: 用可复核结果说明怎样才算完成。
+    validations:
+      required: true
+  - type: textarea
+    id: risk
+    attributes:
+      label: 风险与回滚
+      description: 说明失败影响、停止条件和回退方法。
+    validations:
+      required: true

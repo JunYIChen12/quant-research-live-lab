@@ -10,3 +10,12 @@ These rules apply to all automated agents and contributors.
 6. Every risk or order-state change requires tests, failure analysis, and rollback notes.
 7. Never claim profitability from in-sample results or a small number of live trades.
 8. Do not add live exchange adapters until a separate reviewed milestone explicitly authorizes them.
+
+## GitHub task governance
+
+- GitHub Issue is the formal task state source; local task notes are execution evidence.
+- Non-L0 work requires one Issue with one primary objective, scope and acceptance criteria.
+- Request state changes with `/transition STATE`; do not skip `READY` or edit `status:*` labels directly.
+- Bind independent verification to the exact Pull Request HEAD with `/verify PASS <full-head-sha>`.
+- A code task is not closed until its accepted Pull Request is merged into `main`.
+- Governance automation cannot grant Dry-run, live trading or risk expansion approval.
