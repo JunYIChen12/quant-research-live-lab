@@ -544,7 +544,7 @@ def handle_issue_closed(event: dict[str, Any], client: GitHubClient) -> int:
         client.update_issue(issue["number"], state="open")
         client.comment(issue["number"], "治理门禁重新打开 Issue：CLOSED 缺少已合并 Pull Request。")
         return 1
-    if context.merged_pull_request:
+    if context.merged_pull_request and not context.open_pull_request:
         client.update_issue(issue["number"], labels=_replace_status_label(issue, "CLOSED"))
         client.comment(issue["number"], _audit_marker("state", "CLOSED"))
         return 0
