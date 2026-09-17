@@ -1,7 +1,15 @@
+from pathlib import Path
+
 from tools.governance import (
+    GitHubClient,
     PullRequestContext,
     TransitionContext,
+    _is_small_documentation_change,
+    _manual_label_change_detected,
+    _verification_passed,
     extract_linked_issue,
+    handle_issue_closed,
+    handle_issue_label_change,
     handle_pull_request,
     handle_transition,
     handle_verification,
@@ -146,7 +154,7 @@ class FakePullRequestClient:
     def issue(self, number: int) -> dict[str, object]:
         assert number == 9
         label = f"status:{self.issue_status.lower().replace('_', '-')}"
-        return {"labels": [{"name": label}]}
+        return {"number": 9, "labels": [{"name": label}]}
 
     def pull_request_files(self, number: int) -> tuple[str, ...]:
         assert number == 10
@@ -167,6 +175,16 @@ class FakePullRequestClient:
     def pull_request_reviews(self, number: int) -> list[dict[str, object]]:
         assert number == 10
         return []
+
+    def pull_request_commits(self, number: int) -> list[dict[str, object]]:
+        assert number == 10
+        return [{"committer": {"login": "implementer"}}]
+
+    def update_issue(self, number: int, **changes: object) -> None:
+        assert number == 9
+
+    def comment(self, number: int, body: str) -> None:
+        assert number == 9
 
     def set_commit_status(self, sha: str, state: str, description: str) -> None:
         self.statuses.append((sha, state, description))
@@ -232,17 +250,18 @@ def test_verification_command_binds_exact_head_sha() -> None:
 class FakeVerificationClient:
     def __init__(self) -> None:
         self.comments: list[str] = []
+        self.statuses: list[tuple[str, str, str]] = []
 
     def issue(self, number: int) -> dict[str, object]:
         assert number == 9
-        return {"labels": [{"name": "status:ready-for-verify"}]}
+        return {"number": 9, "labels": [{"name": "status:ready-for-verify"}]}
 
     def pull_requests(self) -> list[dict[str, object]]:
         return [
             {
                 "number": 10,
                 "state": "open",
-                "body": "Closes #9",
+                "body": PR_EVENT["pull_request"]["body"],
                 "head": {"sha": "a" * 40},
                 "user": {"login": "implementer"},
             }
@@ -251,6 +270,29 @@ class FakeVerificationClient:
     def comment(self, number: int, body: str) -> None:
         assert number == 9
         self.comments.append(body)
+
+    def pull_request_files(self, number: int) -> tuple[str, ...]:
+        assert number == 10
+        return ("tools/governance.py",)
+
+    def pull_request_commits(self, number: int) -> list[dict[str, object]]:
+        assert number == 10
+        return [{"committer": {"login": "implementer"}}]
+
+    def set_commit_status(self, sha: str, state: str, description: str) -> None:
+        self.statuses.append((sha, state, description))
+
+    def update_issue(self, number: int, **changes: object) -> None:
+        assert number == 9
+
+    def issue_comments(self, number: int) -> list[dict[str, object]]:
+        return [
+            {
+                "body": f"/verify PASS {'a' * 40}",
+                "author_association": "MEMBER",
+                "user": {"login": "verifier"},
+            }
+        ]
 
 
 def test_implementation_author_cannot_record_independent_verification() -> None:
@@ -265,12 +307,13 @@ def test_implementation_author_cannot_record_independent_verification() -> None:
     }
 
     assert handle_verification(event, client) == 1
-    assert client.comments == ["治理门禁拒绝：实施者不能验收自己的 Pull Request。"]
+    assert client.comments == ["治理门禁拒绝：实施者或最后推送者不能独立验收 Pull Request。"]
 
 
 class FakeTransitionClient:
     def __init__(self) -> None:
         self.statuses: list[tuple[str, str, str]] = []
+        self.pull_body = "Closes #9"
 
     def issue(self, number: int) -> dict[str, object]:
         assert number == 9
@@ -286,7 +329,7 @@ class FakeTransitionClient:
             {
                 "number": 10,
                 "state": "open",
-                "body": "Closes #9",
+                "body": self.pull_body,
                 "head": {"sha": "a" * 40},
                 "user": {"login": "owner"},
                 "merged_at": None,
@@ -302,6 +345,24 @@ class FakeTransitionClient:
     def set_commit_status(self, sha: str, state: str, description: str) -> None:
         self.statuses.append((sha, state, description))
 
+    def issue_comments(self, number: int) -> list[dict[str, object]]:
+        return [
+            {
+                "body": f"/verify PASS {'a' * 40}",
+                "author_association": "MEMBER",
+                "user": {"login": "verifier"},
+            }
+        ]
+
+    def pull_request_files(self, number: int) -> tuple[str, ...]:
+        return ("tools/governance.py",)
+
+    def pull_request_commits(self, number: int) -> list[dict[str, object]]:
+        return [{"committer": {"login": "owner"}}]
+
+    def pull_request_reviews(self, number: int) -> list[dict[str, object]]:
+        return []
+
 
 def test_rework_immediately_invalidates_green_governance_status() -> None:
     client = FakeTransitionClient()
@@ -312,3 +373,189 @@ def test_rework_immediately_invalidates_green_governance_status() -> None:
 
     assert handle_transition(event, client) == 0
     assert client.statuses == [("a" * 40, "pending", "任务状态为 REWORK")]
+
+
+def test_l0_rejects_governance_security_architecture_runtime_and_workflow_files() -> None:
+    protected = (
+        "AGENTS.md",
+        "CONTRIBUTING.md",
+        "SECURITY.md",
+        ".github/workflows/ci.yml",
+        "docs/architecture.md",
+        "docs/safety-model.md",
+        "docs/governance/RELEASE_POLICY.md",
+        "docs/adr/ADR-1.md",
+        "docs/codex/CURRENT_TASK.md",
+    )
+
+    assert all(not _is_small_documentation_change((path,)) for path in protected)
+
+
+def test_l0_allows_only_low_risk_documentation_paths() -> None:
+    assert _is_small_documentation_change(("README.md",))
+    assert _is_small_documentation_change(("docs/typo.md",))
+    assert not _is_small_documentation_change(("src/quant_lab/gates.py",))
+
+
+def test_paginated_pull_request_files_cannot_hide_non_documentation_change() -> None:
+    class PagedClient(GitHubClient):
+        def __init__(self) -> None:
+            super().__init__("owner/repo", "token")
+
+        def request(self, method: str, path: str, payload: dict[str, object] | None = None):
+            if path.endswith("page=1"):
+                return [{"filename": "docs/typo.md"} for _ in range(100)]
+            if path.endswith("page=2"):
+                return [{"filename": "src/quant_lab/gates.py"}]
+            raise AssertionError(path)
+
+    files = PagedClient().pull_request_files(10)
+
+    assert len(files) == 101
+    assert not _is_small_documentation_change(files)
+
+
+def test_acceptance_refuses_invalid_current_pull_request() -> None:
+    client = FakeTransitionClient()
+    client.pull_body = "Closes #9\n## 变更\n缺少其余章节"
+    event = {
+        "issue": {"number": 9},
+        "comment": {"body": "/transition ACCEPTED", "author_association": "OWNER"},
+    }
+
+    assert handle_transition(event, client) == 1
+    assert client.statuses == [("a" * 40, "failure", "治理检查失败")]
+
+
+def test_review_verification_requires_trusted_independent_reviewer() -> None:
+    class ReviewClient:
+        def issue_comments(self, number: int) -> list[dict[str, object]]:
+            return []
+
+        def pull_request_reviews(self, number: int) -> list[dict[str, object]]:
+            return [
+                {
+                    "state": "APPROVED",
+                    "commit_id": "a" * 40,
+                    "user": {"login": "external"},
+                    "author_association": "NONE",
+                }
+            ]
+
+        def pull_request_commits(self, number: int) -> list[dict[str, object]]:
+            return [{"author": {"login": "implementer"}, "committer": {"login": "implementer"}}]
+
+    pull = {"head": {"sha": "a" * 40}, "user": {"login": "implementer"}, "number": 10}
+
+    assert not _verification_passed(ReviewClient(), 9, pull)
+
+
+def test_review_verification_rejects_last_pusher_and_review_state_retraction() -> None:
+    class ReviewClient:
+        def issue_comments(self, number: int) -> list[dict[str, object]]:
+            return []
+
+        def pull_request_reviews(self, number: int) -> list[dict[str, object]]:
+            return [
+                {
+                    "state": "APPROVED",
+                    "commit_id": "a" * 40,
+                    "user": {"login": "reviewer"},
+                    "author_association": "MEMBER",
+                },
+                {
+                    "state": "CHANGES_REQUESTED",
+                    "commit_id": "a" * 40,
+                    "user": {"login": "reviewer"},
+                    "author_association": "MEMBER",
+                },
+            ]
+
+        def pull_request_commits(self, number: int) -> list[dict[str, object]]:
+            return [{"author": {"login": "reviewer"}, "committer": {"login": "reviewer"}}]
+
+    pull = {"head": {"sha": "a" * 40}, "user": {"login": "implementer"}, "number": 10}
+
+    assert not _verification_passed(ReviewClient(), 9, pull)
+
+
+def test_issue_comment_deletion_recomputes_governance() -> None:
+    client = FakeVerificationClient()
+    client.statuses = []
+    event = {"action": "deleted", "issue": {"number": 9}, "comment": {}}
+
+    assert handle_verification(event, client) == 0
+    assert client.statuses == [("a" * 40, "pending", "等待独立验收通过")]
+
+
+def test_revoked_current_acceptance_returns_to_verification() -> None:
+    client = FakePullRequestClient("ACCEPTED")
+    event = {"action": "dismissed", "pull_request": PR_EVENT["pull_request"]}
+
+    assert handle_pull_request(event, client) == 0
+    assert client.statuses == [
+        ("a" * 40, "pending", "等待当前提交的独立验收")
+    ]
+
+
+def test_closed_issue_label_cannot_skip_merge_gate() -> None:
+    client = FakeTransitionClient()
+    event = {"issue": {"number": 9}}
+
+    assert handle_issue_closed(event, client) == 1
+
+
+def test_analysis_issue_can_close_with_a_close_conclusion() -> None:
+    context = TransitionContext(
+        body="## 关闭结论\n已完成分析。",
+        labels=frozenset({"type:analysis"}),
+    )
+
+    assert validate_transition("ANALYZING", "CLOSED", context) == []
+
+
+def test_manual_status_label_change_fails_closed() -> None:
+    client = FakeTransitionClient()
+    event = {
+        "action": "labeled",
+        "issue": {"number": 9},
+        "label": {"name": "status:accepted"},
+        "sender": {"login": "owner"},
+    }
+
+    assert handle_issue_label_change(event, client) == 1
+    assert client.statuses == [("a" * 40, "failure", "治理检查失败")]
+
+
+def test_verification_record_cannot_clear_manual_label_failure_audit() -> None:
+    class AuditClient:
+        def __init__(self, comments: list[dict[str, object]]) -> None:
+            self.comments = comments
+
+        def issue_comments(self, number: int) -> list[dict[str, object]]:
+            return self.comments
+
+    bot = {"login": "github-actions[bot]"}
+    invalid = {"body": "<!-- governance-audit: invalid-status-label-change -->", "user": bot}
+    verification = {"body": "<!-- governance-audit: verification aaaa -->", "user": bot}
+    state = {"body": "<!-- governance-audit: state READY_FOR_VERIFY -->", "user": bot}
+
+    assert _manual_label_change_detected(AuditClient([invalid, verification]), 9)
+    assert not _manual_label_change_detected(AuditClient([invalid, state]), 9)
+
+
+def test_accepted_state_can_return_to_verification() -> None:
+    context = TransitionContext(body=READY_BODY, open_pull_request=True)
+
+    assert validate_transition("ACCEPTED", "READY_FOR_VERIFY", context) == []
+
+
+def test_bootstrap_workflow_never_uses_pr_checker_when_base_has_none() -> None:
+    workflow = Path(".github/workflows/governance.yml").read_text(encoding="utf-8")
+
+    assert "cp tools/governance.py" not in workflow
+    assert "Bootstrap: base has no trusted checker; fail closed." in workflow
+    assert "exit 1" in workflow
+    assert "types: [created, edited, deleted]" in workflow
+    assert "types: [submitted, edited, dismissed]" in workflow
+    assert "issues: write" in workflow

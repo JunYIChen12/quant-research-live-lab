@@ -43,6 +43,8 @@ The gate checks:
 
 Draft Pull Requests may be created during implementation. The `governance` commit status remains pending until the Issue reaches `ACCEPTED`; passing CI alone does not authorize merge or runtime execution.
 
+The first governance Pull Request is a bootstrap exception: when `main` has no trusted checker, its governance workflow fails closed and never uses the Pull Request's checker to create a success proof. Merge it only through the existing ordinary required checks. After merge, verify the workflow from `main`, enable `governance` as a required status, and record that repository setting change.
+
 After independent verification, a trusted collaborator records the exact reviewed commit with `/verify PASS <full-head-sha>`, then requests `/transition ACCEPTED`. A later commit makes the old verification stale and returns the governance status to pending.
 
 L0 spelling and small documentation fixes may omit an Issue, but still require a Pull Request and CI. Changes to governance, security, Actions or runtime rules are never L0.
