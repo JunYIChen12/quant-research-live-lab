@@ -18,6 +18,7 @@ BOT_LOGIN = "github-actions[bot]"
 AUDIT_PREFIX = "<!-- governance-audit:"
 ISSUE_CONTRACT_SECTIONS = ("目标", "范围", "不在范围", "验收标准", "风险与回滚")
 PR_SECTIONS = ("变更", "证据", "风险与回滚", "未验证事项", "独立验收")
+VERIFICATION_LABELS = frozenset({"verification:passed", "verification:solo-owner"})
 
 TRANSITIONS = {
     "": {"DRAFT"},
@@ -82,6 +83,15 @@ def parse_transition_command(text: str) -> str | None:
 def parse_verification_command(text: str) -> str | None:
     match = re.fullmatch(r"\s*/verify\s+PASS\s+([0-9a-fA-F]{40})\s*", text)
     return match.group(1).lower() if match else None
+
+
+def parse_solo_verification_command(text: str) -> tuple[str, str] | None:
+    match = re.fullmatch(
+        r"\s*/verify\s+SOLO\s+PASS\s+([0-9a-fA-F]{40})\s+EVIDENCE\s+"
+        r"((?:https?://|codex://)\S+)\s*",
+        text,
+    )
+    return (match.group(1).lower(), match.group(2)) if match else None
 
 
 def status_from_labels(labels: tuple[str, ...] | list[str]) -> str:
@@ -196,6 +206,10 @@ class GitHubClient:
         self.token = token
         self.api_root = f"https://api.github.com/repos/{repository}"
 
+    @property
+    def repository_owner(self) -> str:
+        return self.repository.split("/", 1)[0]
+
     def request(self, method: str, path: str, payload: dict[str, Any] | None = None) -> Any:
         data = json.dumps(payload).encode() if payload is not None else None
         request = urllib.request.Request(
@@ -295,6 +309,15 @@ def _verification_passed(
     head_sha = (pull.get("head", {}).get("sha") or "").lower()
     author = (pull.get("user") or {}).get("login")
     last_pusher = _last_pusher_login(client, pull)
+    repository_owner = _repository_owner(client)
+    solo_comment_passed = any(
+        (record := parse_solo_verification_command(comment.get("body") or ""))
+        and record[0] == head_sha
+        and comment.get("author_association") in TRUSTED_ASSOCIATIONS
+        and (comment.get("user") or {}).get("login") == repository_owner
+        and not _is_bot_user(comment.get("user") or {})
+        for comment in client.issue_comments(issue_number)
+    )
     comment_passed = any(
         comment.get("author_association") in TRUSTED_ASSOCIATIONS
         and (comment.get("user") or {}).get("login")
@@ -316,7 +339,7 @@ def _verification_passed(
         and (review.get("commit_id") or "").lower() == head_sha
         for login, review in latest_reviews.items()
     )
-    return comment_passed or review_passed
+    return solo_comment_passed or comment_passed or review_passed
 
 
 def _last_pusher_login(client: GitHubClient, pull: dict[str, Any]) -> str | None:
@@ -331,6 +354,13 @@ def _last_pusher_login(client: GitHubClient, pull: dict[str, Any]) -> str | None
         (last.get("committer") or {}).get("login")
         or (last.get("author") or {}).get("login")
     )
+
+
+def _repository_owner(client: GitHubClient) -> str:
+    owner = getattr(client, "repository_owner", "")
+    if owner:
+        return owner
+    return getattr(client, "repository", "").split("/", 1)[0]
 
 
 def _is_bot_user(user: dict[str, Any]) -> bool:
@@ -396,7 +426,7 @@ def _replace_status_label(issue: dict[str, Any], target_state: str) -> list[str]
         label
         for label in _label_names(issue)
         if not label.startswith(STATE_PREFIX)
-        and (target_state == "ACCEPTED" or label != "verification:passed")
+        and (target_state == "ACCEPTED" or label not in VERIFICATION_LABELS)
     ]
     labels.append(_status_label(target_state))
     return labels
@@ -482,7 +512,10 @@ def handle_transition(event: dict[str, Any], client: GitHubClient) -> int:
 
 def handle_verification(event: dict[str, Any], client: GitHubClient) -> int:
     comment = event["comment"]
-    verified_sha = parse_verification_command(comment.get("body") or "")
+    solo_record = parse_solo_verification_command(comment.get("body") or "")
+    verified_sha = solo_record[0] if solo_record else parse_verification_command(
+        comment.get("body") or ""
+    )
     if verified_sha is None:
         if event.get("action") in {"deleted", "edited"}:
             return _recompute_issue_governance(event["issue"]["number"], client)
@@ -503,13 +536,31 @@ def handle_verification(event: dict[str, Any], client: GitHubClient) -> int:
     if len(pulls) != 1 or pulls[0]["head"]["sha"].lower() != verified_sha:
         client.comment(issue_number, "治理门禁拒绝：验收 SHA 与唯一开放 PR 的 HEAD 不一致。")
         return 1
-    last_pusher = _last_pusher_login(client, pulls[0])
-    if _is_bot_user(comment.get("user") or {}) or verifier in {
-        (pulls[0].get("user") or {}).get("login"),
-        last_pusher,
-    }:
-        client.comment(issue_number, "治理门禁拒绝：实施者或最后推送者不能独立验收 Pull Request。")
-        return 1
+    if solo_record:
+        repository_owner = _repository_owner(client)
+        if comment.get("author_association") not in TRUSTED_ASSOCIATIONS:
+            client.comment(
+                issue_number,
+                "治理门禁拒绝：solo owner attestation 需要可信仓库所有者身份。",
+            )
+            return 1
+        if _is_bot_user(comment.get("user") or {}) or verifier != repository_owner:
+            client.comment(
+                issue_number,
+                "治理门禁拒绝：solo owner attestation 必须由仓库所有者记录。",
+            )
+            return 1
+    else:
+        last_pusher = _last_pusher_login(client, pulls[0])
+        if _is_bot_user(comment.get("user") or {}) or verifier in {
+            (pulls[0].get("user") or {}).get("login"),
+            last_pusher,
+        }:
+            client.comment(
+                issue_number,
+                "治理门禁拒绝：实施者或最后推送者不能独立验收 Pull Request。",
+            )
+            return 1
     pr_errors = _pull_request_errors(client, issue, pulls[0])
     if pr_errors:
         client.set_commit_status(pulls[0]["head"]["sha"], "failure", "治理检查失败")
@@ -519,14 +570,23 @@ def handle_verification(event: dict[str, Any], client: GitHubClient) -> int:
         )
         return 1
 
-    labels = [label for label in _label_names(issue) if label != "verification:passed"]
+    labels = [label for label in _label_names(issue) if label not in VERIFICATION_LABELS]
     labels.append("verification:passed")
+    if solo_record:
+        labels.append("verification:solo-owner")
     client.update_issue(issue_number, labels=labels)
-    client.comment(
-        issue_number,
-        f"已记录当前 PR HEAD `{verified_sha}` 的独立验收通过。\n"
-        f"{_audit_marker('verification', verified_sha)}",
-    )
+    if solo_record:
+        client.comment(
+            issue_number,
+            f"已记录当前 PR HEAD `{verified_sha}` 的 solo owner attestation；"
+            f"Codex 证据引用：`{solo_record[1]}`。",
+        )
+    else:
+        client.comment(
+            issue_number,
+            f"已记录当前 PR HEAD `{verified_sha}` 的独立验收通过。\n"
+            f"{_audit_marker('verification', verified_sha)}",
+        )
     return 0
 
 
@@ -576,8 +636,11 @@ def _recompute_pull_request_status(
             print("\n".join(f"- {error}" for error in errors), file=sys.stderr)
         return 1
 
-    verification_current = issue_status == "ACCEPTED" and _verification_passed(
-        client, issue_number, pull
+    has_verification_record = "verification:passed" in _label_names(issue)
+    verification_current = (
+        _verification_passed(client, issue_number, pull)
+        if issue_status == "ACCEPTED" or has_verification_record
+        else False
     )
     stale_acceptance = False
     if issue_status == "ACCEPTED" and not verification_current:
@@ -589,6 +652,13 @@ def _recompute_pull_request_status(
             f"{_audit_marker('state', 'READY_FOR_VERIFY')}",
         )
         issue_status = "READY_FOR_VERIFY"
+    elif "verification:passed" in _label_names(issue) and not verification_current:
+        client.update_issue(issue_number, labels=_replace_status_label(issue, issue_status))
+        client.comment(
+            issue_number,
+            "治理门禁失效当前验收：新提交未继承旧验收记录。\n"
+            f"{_audit_marker('verification-invalidated', head_sha)}",
+        )
 
     if issue_status == "ACCEPTED" and verification_current:
         client.set_commit_status(head_sha, "success", "治理检查通过")

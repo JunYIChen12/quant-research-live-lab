@@ -13,6 +13,7 @@ from tools.governance import (
     handle_pull_request,
     handle_transition,
     handle_verification,
+    parse_solo_verification_command,
     parse_transition_command,
     parse_verification_command,
     status_from_labels,
@@ -247,6 +248,15 @@ def test_verification_command_binds_exact_head_sha() -> None:
     assert parse_verification_command(f"text /verify PASS {sha}") is None
 
 
+def test_solo_verification_requires_structured_codex_evidence() -> None:
+    sha = "a" * 40
+
+    assert parse_solo_verification_command(
+        f"/verify SOLO PASS {sha} EVIDENCE codex://thread/123"
+    ) == (sha, "codex://thread/123")
+    assert parse_solo_verification_command(f"/verify SOLO PASS {sha}") is None
+
+
 class FakeVerificationClient:
     def __init__(self) -> None:
         self.comments: list[str] = []
@@ -293,6 +303,100 @@ class FakeVerificationClient:
                 "user": {"login": "verifier"},
             }
         ]
+
+
+class FakeSoloVerificationClient(FakeVerificationClient):
+    repository = "owner/repo"
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.updates: list[dict[str, object]] = []
+
+    def update_issue(self, number: int, **changes: object) -> None:
+        assert number == 9
+        self.updates.append(changes)
+
+
+def test_solo_owner_attestation_is_explicit_and_records_mode() -> None:
+    client = FakeSoloVerificationClient()
+    sha = "a" * 40
+    event = {
+        "issue": {"number": 9},
+        "comment": {
+            "body": f"/verify SOLO PASS {sha} EVIDENCE codex://thread/123",
+            "author_association": "OWNER",
+            "user": {"login": "owner"},
+        },
+    }
+
+    assert handle_verification(event, client) == 0
+    assert client.updates == [
+        {
+            "labels": [
+                "status:ready-for-verify",
+                "verification:passed",
+                "verification:solo-owner",
+            ]
+        }
+    ]
+    assert client.comments == [
+        "已记录当前 PR HEAD `" + sha + "` 的 solo owner attestation；"
+        "Codex 证据引用：`codex://thread/123`。"
+    ]
+
+
+def test_solo_owner_attestation_is_bound_to_current_head() -> None:
+    sha = "a" * 40
+
+    class SoloEvidenceClient:
+        repository = "owner/repo"
+
+        def issue_comments(self, number: int) -> list[dict[str, object]]:
+            return [
+                {
+                    "body": f"/verify SOLO PASS {sha} EVIDENCE codex://thread/123",
+                    "author_association": "OWNER",
+                    "user": {"login": "owner"},
+                }
+            ]
+
+        def pull_request_reviews(self, number: int) -> list[dict[str, object]]:
+            return []
+
+        def pull_request_commits(self, number: int) -> list[dict[str, object]]:
+            return [{"committer": {"login": "implementer"}}]
+
+    client = SoloEvidenceClient()
+    pull = {"head": {"sha": sha}, "user": {"login": "implementer"}, "number": 10}
+
+    assert _verification_passed(client, 9, pull)
+    assert not _verification_passed(client, 9, {**pull, "head": {"sha": "b" * 40}})
+
+
+def test_solo_owner_attestation_cannot_be_recorded_by_a_bot() -> None:
+    sha = "a" * 40
+
+    class BotEvidenceClient:
+        repository = "owner/repo"
+
+        def issue_comments(self, number: int) -> list[dict[str, object]]:
+            return [
+                {
+                    "body": f"/verify SOLO PASS {sha} EVIDENCE codex://thread/123",
+                    "author_association": "OWNER",
+                    "user": {"login": "owner[bot]", "type": "Bot"},
+                }
+            ]
+
+        def pull_request_reviews(self, number: int) -> list[dict[str, object]]:
+            return []
+
+        def pull_request_commits(self, number: int) -> list[dict[str, object]]:
+            return [{"committer": {"login": "owner[bot]"}}]
+
+    pull = {"head": {"sha": sha}, "user": {"login": "implementer"}, "number": 10}
+
+    assert not _verification_passed(BotEvidenceClient(), 9, pull)
 
 
 def test_implementation_author_cannot_record_independent_verification() -> None:

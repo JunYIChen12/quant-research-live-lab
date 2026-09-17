@@ -12,7 +12,7 @@
 
 ## 决定
 
-采用方案 3。正式任务状态使用 `status:*` 标签，通过 Issue 评论 `/transition STATE` 请求流转。代码任务使用 Draft PR 提前运行 CI；治理提交状态在独立验收前保持 `pending`。验收记录必须用 `/verify PASS <完整 HEAD SHA>` 绑定准确提交，Issue 进入 `ACCEPTED` 后才变为 `success`；后续新提交自动使旧验收失效。
+采用方案 3。正式任务状态使用 `status:*` 标签，通过 Issue 评论 `/transition STATE` 请求流转。代码任务使用 Draft PR 提前运行 CI；治理提交状态在独立验收前保持 `pending`。默认多人验收记录必须用 `/verify PASS <完整 HEAD SHA>` 绑定准确提交。个人仓库可由所有者显式选择 `/verify SOLO PASS <完整 HEAD SHA> EVIDENCE <Codex 或 HTTPS 引用>`，记录 `verification:solo-owner`；该记录是 owner attestation，不伪装成另一位人工审核者。GitHub 无法证明 Codex 线程独立性，因此结构化证据引用是可复核要求，而不是自动证明。Issue 进入 `ACCEPTED` 后才变为 `success`；后续新提交自动使旧验收失效。
 
 `docs/codex` 不再独立决定正式状态，只记录责任线程、详细证据、失败和交接。两者冲突时以 GitHub Issue 为准；GitHub 状态无法核对时失败关闭。
 
@@ -25,7 +25,7 @@
 
 - 非 L0 工作必须有关联 Issue。
 - 状态变化由治理工作流检查；直接修改标签不属于受支持的流转方式。
-- 自动化只能检查证据存在和状态顺序，不能代替用户确认、独立验收、Dry-run 或实盘授权。
+- 自动化只能检查证据存在和状态顺序，不能代替用户确认、独立验收、solo owner attestation 的明确选择、Dry-run 或实盘授权。
 - 仓库管理员仍具有平台级权限；治理目标是阻止普通流程误操作，不声称能限制仓库所有者的恶意绕过。
 
 ## 验证
