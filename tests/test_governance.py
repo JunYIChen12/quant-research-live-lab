@@ -527,6 +527,49 @@ def test_closed_issue_label_cannot_skip_merge_gate() -> None:
     assert handle_issue_closed(event, client) == 1
 
 
+def test_merged_pull_request_close_event_finishes_rework_issue() -> None:
+    class MergedReworkCloseClient(FakeTransitionClient):
+        def __init__(self) -> None:
+            super().__init__()
+            self.updates: list[dict[str, object]] = []
+            self.comments: list[str] = []
+
+        def issue(self, number: int) -> dict[str, object]:
+            assert number == 9
+            return {
+                "number": 9,
+                "body": READY_BODY,
+                "labels": [{"name": "status:rework"}],
+                "assignees": [{"login": "owner"}],
+            }
+
+        def pull_requests(self) -> list[dict[str, object]]:
+            return [
+                {
+                    "number": 10,
+                    "state": "closed",
+                    "body": self.pull_body,
+                    "head": {"sha": "a" * 40},
+                    "user": {"login": "owner"},
+                    "merged_at": "2026-09-17T05:00:00Z",
+                }
+            ]
+
+        def update_issue(self, number: int, **changes: object) -> None:
+            assert number == 9
+            self.updates.append(changes)
+
+        def comment(self, number: int, body: str) -> None:
+            assert number == 9
+            self.comments.append(body)
+
+    client = MergedReworkCloseClient()
+
+    assert handle_issue_closed({"issue": {"number": 9}}, client) == 0
+    assert client.updates == [{"labels": ["status:closed"]}]
+    assert client.comments == ["<!-- governance-audit: state CLOSED -->"]
+
+
 def test_analysis_issue_can_close_with_a_close_conclusion() -> None:
     context = TransitionContext(
         body="## 关闭结论\n已完成分析。",
