@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### 2026-09-17 GitHub 治理迁移收尾
+
+- 明确默认分支新增验收命令时采用两步迁移：先完成独立验收并由 owner 明确授权合并兼容性 Pull Request，再从新 `main` 建立最小激活/收尾 Pull Request。
+- 要求新 `main` 在开放的激活/收尾 Pull Request 上完整执行 `verify -> ACCEPTED -> merge -> CLOSED`；不得直接修改 `status:*` 标签或伪造审核者。
+
 ### 2026-09-17 GitHub 任务状态门禁
 
 - 将 GitHub Issue 定义为正式任务状态源，`docs/codex` 保留执行证据和线程交接。
