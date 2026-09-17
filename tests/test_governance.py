@@ -733,6 +733,9 @@ class FakeClosedPullRequestClient:
                 "body": PR_EVENT["pull_request"]["body"],
                 "head": {"sha": self.current_head},
                 "user": {"login": "implementer"},
+                "merged": self.merged,
+                "merged_at": "2026-09-17T05:00:00Z" if self.merged else None,
+                "merge_commit_sha": self.merge_commit_sha,
             }
         ]
         if self.other_open:
@@ -788,6 +791,15 @@ def _closed_pull_request_event(
     }
 
 
+def _closed_pull_request_audit(
+    number: int, head_sha: str, merge_commit_sha: str
+) -> str:
+    return (
+        "<!-- governance-audit: closed-by-pr PR "
+        f"{number} HEAD {head_sha} MERGE {merge_commit_sha} -->"
+    )
+
+
 def test_exact_merged_pull_request_close_event_closes_accepted_issue() -> None:
     client = FakeClosedPullRequestClient()
 
@@ -814,11 +826,7 @@ def test_issue_closed_accepts_only_pull_request_close_audit() -> None:
         def issue_comments(self, number: int) -> list[dict[str, object]]:
             return [
                 {
-                    "body": "<!-- governance-audit: closed-by-pr PR 10 HEAD "
-                    + "a" * 40
-                    + " MERGE "
-                    + "c" * 40
-                    + " -->",
+                    "body": _closed_pull_request_audit(10, "a" * 40, "c" * 40),
                     "user": {"login": "github-actions[bot]"},
                 }
             ]
@@ -827,6 +835,78 @@ def test_issue_closed_accepts_only_pull_request_close_audit() -> None:
 
     assert handle_issue_closed({"issue": {"number": 9}}, client) == 0
     assert client.updates == []
+
+
+def test_issue_closed_rejects_unbound_or_expired_pull_request_audits() -> None:
+    class CloseAuditClient(FakeClosedPullRequestClient):
+        def __init__(
+            self,
+            audit: str,
+            *,
+            current_head: str = "a" * 40,
+            merge_commit_sha: str | None = "c" * 40,
+        ) -> None:
+            super().__init__(
+                current_head=current_head,
+                merge_commit_sha=merge_commit_sha,
+            )
+            self.audit = audit
+
+        def issue(self, number: int) -> dict[str, object]:
+            issue = super().issue(number)
+            issue["labels"] = [{"name": "status:closed"}]
+            return issue
+
+        def issue_comments(self, number: int) -> list[dict[str, object]]:
+            return [
+                {
+                    "body": self.audit,
+                    "user": {"login": "github-actions[bot]"},
+                }
+            ]
+
+    cases = (
+        (
+            "wrong PR",
+            _closed_pull_request_audit(123, "a" * 40, "c" * 40),
+            "a" * 40,
+            "c" * 40,
+        ),
+        (
+            "wrong HEAD",
+            _closed_pull_request_audit(10, "b" * 40, "c" * 40),
+            "a" * 40,
+            "c" * 40,
+        ),
+        (
+            "wrong merge SHA",
+            _closed_pull_request_audit(10, "a" * 40, "d" * 40),
+            "a" * 40,
+            "c" * 40,
+        ),
+        (
+            "forged merge text",
+            _closed_pull_request_audit(123, "b" * 40, "forged"),
+            "a" * 40,
+            "c" * 40,
+        ),
+        (
+            "expired audit",
+            _closed_pull_request_audit(10, "a" * 40, "c" * 40),
+            "b" * 40,
+            "d" * 40,
+        ),
+    )
+
+    for name, audit, current_head, merge_commit_sha in cases:
+        client = CloseAuditClient(
+            audit,
+            current_head=current_head,
+            merge_commit_sha=merge_commit_sha,
+        )
+
+        assert handle_issue_closed({"issue": {"number": 9}}, client) == 1, name
+        assert client.updates == [{"state": "open"}], name
 
 
 def test_old_merged_pull_request_cannot_close_issue_with_new_open_pull_request() -> None:

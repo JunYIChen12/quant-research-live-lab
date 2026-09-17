@@ -19,7 +19,9 @@ AUDIT_PREFIX = "<!-- governance-audit:"
 ISSUE_CONTRACT_SECTIONS = ("目标", "范围", "不在范围", "验收标准", "风险与回滚")
 PR_SECTIONS = ("变更", "证据", "风险与回滚", "未验证事项", "独立验收")
 CLOSED_PR_AUDIT_RE = re.compile(
-    r"^<!-- governance-audit: closed-by-pr PR \d+ HEAD [0-9a-fA-F]{40} MERGE \S+ -->$"
+    r"^<!-- governance-audit: closed-by-pr PR (?P<number>[1-9][0-9]*) "
+    r"HEAD (?P<head>[0-9a-fA-F]{40}) "
+    r"MERGE (?P<merge>[0-9a-fA-F]{40}) -->$"
 )
 
 TRANSITIONS = {
@@ -500,11 +502,26 @@ def _closed_pull_request_audit(pull: dict[str, Any]) -> str:
 def _has_authorized_pull_request_close(
     client: GitHubClient, issue_number: int
 ) -> bool:
-    return any(
-        (comment.get("user") or {}).get("login") == BOT_LOGIN
-        and CLOSED_PR_AUDIT_RE.fullmatch(comment.get("body") or "")
-        for comment in client.issue_comments(issue_number)
-    )
+    related_pulls = {
+        pull.get("number"): pull for pull in _related_pull_requests(client, issue_number)
+    }
+    for comment in client.issue_comments(issue_number):
+        if (comment.get("user") or {}).get("login") != BOT_LOGIN:
+            continue
+        match = CLOSED_PR_AUDIT_RE.fullmatch(comment.get("body") or "")
+        if match is None:
+            continue
+        pull = related_pulls.get(int(match["number"]))
+        if pull is None or pull.get("state") != "closed":
+            continue
+        if (pull.get("head") or {}).get("sha", "").lower() != match["head"].lower():
+            continue
+        if (pull.get("merge_commit_sha") or "").lower() != match["merge"].lower():
+            continue
+        if pull.get("merged") is not True and not pull.get("merged_at"):
+            continue
+        return True
+    return False
 
 
 def handle_issue_opened(event: dict[str, Any], client: GitHubClient) -> int:
