@@ -298,7 +298,7 @@ def _verification_passed(
     comment_passed = any(
         comment.get("author_association") in TRUSTED_ASSOCIATIONS
         and (comment.get("user") or {}).get("login")
-        and (comment.get("user") or {}).get("login") != BOT_LOGIN
+        and not _is_bot_user(comment.get("user") or {})
         and (comment.get("user") or {}).get("login") not in {author, last_pusher}
         and parse_verification_command(comment.get("body") or "") == head_sha
         for comment in client.issue_comments(issue_number)
@@ -311,7 +311,7 @@ def _verification_passed(
     review_passed = any(
         review.get("state") == "APPROVED"
         and review.get("author_association") in TRUSTED_ASSOCIATIONS
-        and login != BOT_LOGIN
+        and not _is_bot_user(review.get("user") or {})
         and login not in {author, last_pusher}
         and (review.get("commit_id") or "").lower() == head_sha
         for login, review in latest_reviews.items()
@@ -331,6 +331,11 @@ def _last_pusher_login(client: GitHubClient, pull: dict[str, Any]) -> str | None
         (last.get("committer") or {}).get("login")
         or (last.get("author") or {}).get("login")
     )
+
+
+def _is_bot_user(user: dict[str, Any]) -> bool:
+    login = user.get("login") or ""
+    return user.get("type") == "Bot" or login.endswith("[bot]")
 
 
 def _manual_label_change_detected(client: GitHubClient, issue_number: int) -> bool:
@@ -499,7 +504,7 @@ def handle_verification(event: dict[str, Any], client: GitHubClient) -> int:
         client.comment(issue_number, "治理门禁拒绝：验收 SHA 与唯一开放 PR 的 HEAD 不一致。")
         return 1
     last_pusher = _last_pusher_login(client, pulls[0])
-    if verifier == BOT_LOGIN or verifier in {
+    if _is_bot_user(comment.get("user") or {}) or verifier in {
         (pulls[0].get("user") or {}).get("login"),
         last_pusher,
     }:

@@ -450,6 +450,28 @@ def test_review_verification_requires_trusted_independent_reviewer() -> None:
     assert not _verification_passed(ReviewClient(), 9, pull)
 
 
+def test_bot_verification_cannot_count_as_independent() -> None:
+    class BotClient:
+        def issue_comments(self, number: int) -> list[dict[str, object]]:
+            return [
+                {
+                    "body": f"/verify PASS {'a' * 40}",
+                    "author_association": "MEMBER",
+                    "user": {"login": "review-bot[bot]", "type": "Bot"},
+                }
+            ]
+
+        def pull_request_reviews(self, number: int) -> list[dict[str, object]]:
+            return []
+
+        def pull_request_commits(self, number: int) -> list[dict[str, object]]:
+            return [{"committer": {"login": "implementer"}}]
+
+    pull = {"head": {"sha": "a" * 40}, "user": {"login": "implementer"}, "number": 10}
+
+    assert not _verification_passed(BotClient(), 9, pull)
+
+
 def test_review_verification_rejects_last_pusher_and_review_state_retraction() -> None:
     class ReviewClient:
         def issue_comments(self, number: int) -> list[dict[str, object]]:
