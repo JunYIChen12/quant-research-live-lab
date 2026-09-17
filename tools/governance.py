@@ -18,7 +18,9 @@ BOT_LOGIN = "github-actions[bot]"
 AUDIT_PREFIX = "<!-- governance-audit:"
 ISSUE_CONTRACT_SECTIONS = ("目标", "范围", "不在范围", "验收标准", "风险与回滚")
 PR_SECTIONS = ("变更", "证据", "风险与回滚", "未验证事项", "独立验收")
-VERIFICATION_LABELS = frozenset({"verification:passed", "verification:solo-owner"})
+CLOSED_PR_AUDIT_RE = re.compile(
+    r"^<!-- governance-audit: closed-by-pr PR \d+ HEAD [0-9a-fA-F]{40} MERGE \S+ -->$"
+)
 
 TRANSITIONS = {
     "": {"DRAFT"},
@@ -43,7 +45,6 @@ class TransitionContext:
     branch_exists: bool = False
     open_pull_request: bool = False
     independent_verification_passed: bool = False
-    merged_pull_request: bool = False
 
 
 @dataclass(frozen=True)
@@ -94,6 +95,52 @@ def parse_solo_verification_command(text: str) -> tuple[str, str] | None:
     return (match.group(1).lower(), match.group(2)) if match else None
 
 
+def _valid_repo_relative_path(path: str) -> bool:
+    if not path or path.startswith("/") or "\\" in path:
+        return False
+    parts = path.split("/")
+    return all(part not in {"", ".", ".."} for part in parts)
+
+
+def _valid_evidence_reference(reference: str, repository: str, pull_number: int) -> bool:
+    parts = urllib.parse.urlsplit(reference)
+    if parts.scheme == "https":
+        if parts.netloc != "github.com" or parts.fragment:
+            return False
+        path = urllib.parse.unquote(parts.path)
+        prefix = f"/{repository}/"
+        if not path.startswith(prefix):
+            return False
+        relative = path[len(prefix) :]
+        segments = relative.split("/")
+        if any(segment in {"", ".", ".."} for segment in segments):
+            return False
+        if segments[0] in {"issues", "pull"}:
+            return len(segments) == 2 and segments[1].isdigit() and int(segments[1]) > 0
+        if segments[0] == "commit":
+            return bool(
+                len(segments) == 2
+                and re.fullmatch(r"[0-9a-fA-F]{7,64}", segments[1])
+            )
+        if segments[0] == "blob":
+            return len(segments) >= 3 and _valid_repo_relative_path("/".join(segments[2:]))
+        return False
+    if parts.scheme != "codex" or parts.netloc != "review" or parts.path or parts.fragment:
+        return False
+    query = urllib.parse.parse_qs(parts.query, keep_blank_values=True)
+    if set(query) != {"pr", "path", "line", "side"} or any(
+        len(values) != 1 for values in query.values()
+    ):
+        return False
+    expected_pr = f"https://github.com/{repository}/pull/{pull_number}"
+    return (
+        query["pr"][0] == expected_pr
+        and _valid_repo_relative_path(query["path"][0])
+        and bool(re.fullmatch(r"[1-9][0-9]*", query["line"][0]))
+        and query["side"][0] in {"left", "right"}
+    )
+
+
 def status_from_labels(labels: tuple[str, ...] | list[str]) -> str:
     states = [
         label.removeprefix(STATE_PREFIX).replace("-", "_").upper()
@@ -142,8 +189,7 @@ def validate_transition(
     elif target == "ACCEPTED" and not context.independent_verification_passed:
         errors.append("ACCEPTED 缺少独立验收通过记录")
     elif target == "CLOSED" and not analysis_close:
-        if not context.merged_pull_request:
-            errors.append("CLOSED 缺少已合并 Pull Request")
+        errors.append("代码任务必须由准确的 Pull Request closed 事件关闭")
     return errors
 
 
@@ -313,6 +359,7 @@ def _verification_passed(
     solo_comment_passed = any(
         (record := parse_solo_verification_command(comment.get("body") or ""))
         and record[0] == head_sha
+        and _valid_evidence_reference(record[1], _repository_name(client), pull["number"])
         and comment.get("author_association") in TRUSTED_ASSOCIATIONS
         and (comment.get("user") or {}).get("login") == repository_owner
         and not _is_bot_user(comment.get("user") or {})
@@ -360,7 +407,11 @@ def _repository_owner(client: GitHubClient) -> str:
     owner = getattr(client, "repository_owner", "")
     if owner:
         return owner
-    return getattr(client, "repository", "").split("/", 1)[0]
+    return _repository_name(client).split("/", 1)[0]
+
+
+def _repository_name(client: GitHubClient) -> str:
+    return getattr(client, "repository", "")
 
 
 def _is_bot_user(user: dict[str, Any]) -> bool:
@@ -417,7 +468,6 @@ def _transition_context(
         ),
         open_pull_request=bool(open_pulls),
         independent_verification_passed=verification_passed,
-        merged_pull_request=any(pull.get("merged_at") for pull in pulls),
     )
 
 
@@ -426,7 +476,7 @@ def _replace_status_label(issue: dict[str, Any], target_state: str) -> list[str]
         label
         for label in _label_names(issue)
         if not label.startswith(STATE_PREFIX)
-        and (target_state == "ACCEPTED" or label not in VERIFICATION_LABELS)
+        and (target_state == "ACCEPTED" or label != "verification:passed")
     ]
     labels.append(_status_label(target_state))
     return labels
@@ -438,6 +488,23 @@ def _set_related_statuses(
     for pull in _related_pull_requests(client, issue_number):
         if pull["state"] == "open":
             client.set_commit_status(pull["head"]["sha"], state, description)
+
+
+def _closed_pull_request_audit(pull: dict[str, Any]) -> str:
+    return _audit_marker(
+        "closed-by-pr",
+        f"PR {pull['number']} HEAD {pull['head']['sha']} MERGE {pull['merge_commit_sha']}",
+    )
+
+
+def _has_authorized_pull_request_close(
+    client: GitHubClient, issue_number: int
+) -> bool:
+    return any(
+        (comment.get("user") or {}).get("login") == BOT_LOGIN
+        and CLOSED_PR_AUDIT_RE.fullmatch(comment.get("body") or "")
+        for comment in client.issue_comments(issue_number)
+    )
 
 
 def handle_issue_opened(event: dict[str, Any], client: GitHubClient) -> int:
@@ -536,6 +603,11 @@ def handle_verification(event: dict[str, Any], client: GitHubClient) -> int:
     if len(pulls) != 1 or pulls[0]["head"]["sha"].lower() != verified_sha:
         client.comment(issue_number, "治理门禁拒绝：验收 SHA 与唯一开放 PR 的 HEAD 不一致。")
         return 1
+    if solo_record and not _valid_evidence_reference(
+        solo_record[1], _repository_name(client), pulls[0]["number"]
+    ):
+        client.comment(issue_number, "治理门禁拒绝：solo evidence 引用不可复核。")
+        return 1
     if solo_record:
         repository_owner = _repository_owner(client)
         if comment.get("author_association") not in TRUSTED_ASSOCIATIONS:
@@ -570,10 +642,8 @@ def handle_verification(event: dict[str, Any], client: GitHubClient) -> int:
         )
         return 1
 
-    labels = [label for label in _label_names(issue) if label not in VERIFICATION_LABELS]
+    labels = [label for label in _label_names(issue) if label != "verification:passed"]
     labels.append("verification:passed")
-    if solo_record:
-        labels.append("verification:solo-owner")
     client.update_issue(issue_number, labels=labels)
     if solo_record:
         client.comment(
@@ -593,29 +663,20 @@ def handle_verification(event: dict[str, Any], client: GitHubClient) -> int:
 def handle_issue_closed(event: dict[str, Any], client: GitHubClient) -> int:
     issue = client.issue(event["issue"]["number"])
     current = status_from_labels(_label_names(issue))
-    context = _transition_context(client, issue, "CLOSED")
-    if current == "CLOSED":
-        analysis_close = (
-            "type:analysis" in context.labels
-            and "关闭结论" in markdown_sections(context.body)
-        )
-        if context.merged_pull_request or analysis_close:
-            return 0
-        client.update_issue(issue["number"], state="open")
-        client.comment(issue["number"], "治理门禁重新打开 Issue：CLOSED 缺少已合并 Pull Request。")
-        return 1
-    if context.merged_pull_request and not context.open_pull_request:
-        client.update_issue(issue["number"], labels=_replace_status_label(issue, "CLOSED"))
-        client.comment(issue["number"], _audit_marker("state", "CLOSED"))
+    analysis_close = (
+        "type:analysis" in _label_names(issue)
+        and "关闭结论" in markdown_sections(issue.get("body") or "")
+    )
+    if analysis_close:
         return 0
-    errors = validate_transition(current, "CLOSED", context)
-    if errors:
-        client.update_issue(issue["number"], state="open")
-        client.comment(issue["number"], "治理门禁重新打开 Issue：\n- " + "\n- ".join(errors))
-        return 1
-    client.update_issue(issue["number"], labels=_replace_status_label(issue, "CLOSED"))
-    client.comment(issue["number"], _audit_marker("state", "CLOSED"))
-    return 0
+    if current == "CLOSED" and _has_authorized_pull_request_close(client, issue["number"]):
+        return 0
+    client.update_issue(issue["number"], state="open")
+    client.comment(
+        issue["number"],
+        "治理门禁重新打开 Issue：代码任务必须由准确的 Pull Request closed 事件关闭。",
+    )
+    return 1
 
 
 def _recompute_pull_request_status(
@@ -701,7 +762,42 @@ def handle_issue_label_change(event: dict[str, Any], client: GitHubClient) -> in
     return 1
 
 
+def _handle_closed_pull_request(event: dict[str, Any], client: GitHubClient) -> int:
+    pull = event["pull_request"]
+    if pull.get("merged") is not True:
+        return 0
+    head_sha = (pull.get("head") or {}).get("sha")
+    merge_commit_sha = pull.get("merge_commit_sha")
+    if not isinstance(head_sha, str) or not head_sha:
+        return 1
+    if not isinstance(merge_commit_sha, str) or not merge_commit_sha.strip():
+        return 1
+    issue_number = extract_linked_issue(pull.get("body") or "")
+    if issue_number is None:
+        return 0
+    issue = client.issue(issue_number)
+    if status_from_labels(_label_names(issue)) != "ACCEPTED":
+        return 1
+    if not _verification_passed(client, issue_number, pull):
+        return 1
+    related_pulls = _related_pull_requests(client, issue_number)
+    if any(
+        related.get("number") != pull.get("number") and related.get("state") == "open"
+        for related in related_pulls
+    ):
+        return 1
+    client.comment(issue_number, _closed_pull_request_audit(pull))
+    client.update_issue(
+        issue_number,
+        labels=_replace_status_label(issue, "CLOSED"),
+        state="closed",
+    )
+    return 0
+
+
 def handle_pull_request(event: dict[str, Any], client: GitHubClient) -> int:
+    if event.get("action") == "closed":
+        return _handle_closed_pull_request(event, client)
     pull = event["pull_request"]
     issue_number = extract_linked_issue(pull.get("body") or "")
     if issue_number is None:

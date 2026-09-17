@@ -6,6 +6,7 @@ from tools.governance import (
     TransitionContext,
     _is_small_documentation_change,
     _manual_label_change_detected,
+    _valid_evidence_reference,
     _verification_passed,
     extract_linked_issue,
     handle_issue_closed,
@@ -37,6 +38,11 @@ READY_BODY = """
 ## 风险与回滚
 通过独立 PR 回退。
 """
+
+SOLO_EVIDENCE = (
+    "codex://review?pr=https%3A%2F%2Fgithub.com%2Fowner%2Frepo%2Fpull%2F10"
+    "&path=tools%2Fgovernance.py&line=1&side=right"
+)
 
 
 def test_ready_requires_complete_issue_contract() -> None:
@@ -80,7 +86,7 @@ def test_acceptance_requires_independent_verification() -> None:
 def test_code_task_closes_only_after_merge() -> None:
     errors = validate_transition("ACCEPTED", "CLOSED", TransitionContext(body=READY_BODY))
 
-    assert errors == ["CLOSED 缺少已合并 Pull Request"]
+    assert errors == ["代码任务必须由准确的 Pull Request closed 事件关闭"]
 
 
 def test_rework_returns_only_to_implementation() -> None:
@@ -252,9 +258,35 @@ def test_solo_verification_requires_structured_codex_evidence() -> None:
     sha = "a" * 40
 
     assert parse_solo_verification_command(
-        f"/verify SOLO PASS {sha} EVIDENCE codex://thread/123"
-    ) == (sha, "codex://thread/123")
+        f"/verify SOLO PASS {sha} EVIDENCE {SOLO_EVIDENCE}"
+    ) == (sha, SOLO_EVIDENCE)
     assert parse_solo_verification_command(f"/verify SOLO PASS {sha}") is None
+
+
+def test_evidence_reference_accepts_only_reviewable_repository_paths() -> None:
+    repository = "owner/repo"
+    accepted = (
+        "https://github.com/owner/repo/issues/9",
+        "https://github.com/owner/repo/pull/10",
+        "https://github.com/owner/repo/commit/" + "a" * 40,
+        "https://github.com/owner/repo/blob/main/tools/governance.py",
+        SOLO_EVIDENCE,
+    )
+    rejected = (
+        "https://?",
+        "https://x",
+        "https://github.com/other/repo/issues/9",
+        "codex://x",
+        "codex://thread/123",
+        "codex://review?pr=https%3A%2F%2Fgithub.com%2Fowner%2Frepo%2Fpull%2F10",
+        "codex://review?pr=https%3A%2F%2Fgithub.com%2Fowner%2Frepo%2Fpull%2F11"
+        "&path=tools%2Fgovernance.py&line=1&side=right",
+        "codex://review?pr=https%3A%2F%2Fgithub.com%2Fowner%2Frepo%2Fpull%2F10"
+        "&path=../tools%2Fgovernance.py&line=1&side=right",
+    )
+
+    assert all(_valid_evidence_reference(value, repository, 10) for value in accepted)
+    assert not any(_valid_evidence_reference(value, repository, 10) for value in rejected)
 
 
 class FakeVerificationClient:
@@ -323,7 +355,7 @@ def test_solo_owner_attestation_is_explicit_and_records_mode() -> None:
     event = {
         "issue": {"number": 9},
         "comment": {
-            "body": f"/verify SOLO PASS {sha} EVIDENCE codex://thread/123",
+            "body": f"/verify SOLO PASS {sha} EVIDENCE {SOLO_EVIDENCE}",
             "author_association": "OWNER",
             "user": {"login": "owner"},
         },
@@ -335,14 +367,30 @@ def test_solo_owner_attestation_is_explicit_and_records_mode() -> None:
             "labels": [
                 "status:ready-for-verify",
                 "verification:passed",
-                "verification:solo-owner",
             ]
         }
     ]
     assert client.comments == [
         "已记录当前 PR HEAD `" + sha + "` 的 solo owner attestation；"
-        "Codex 证据引用：`codex://thread/123`。"
+        "Codex 证据引用：`" + SOLO_EVIDENCE + "`。"
     ]
+
+
+def test_solo_verification_rejects_unreviewable_evidence() -> None:
+    client = FakeSoloVerificationClient()
+    sha = "a" * 40
+    event = {
+        "issue": {"number": 9},
+        "comment": {
+            "body": f"/verify SOLO PASS {sha} EVIDENCE codex://thread/123",
+            "author_association": "OWNER",
+            "user": {"login": "owner"},
+        },
+    }
+
+    assert handle_verification(event, client) == 1
+    assert client.updates == []
+    assert client.comments == ["治理门禁拒绝：solo evidence 引用不可复核。"]
 
 
 def test_solo_owner_attestation_is_bound_to_current_head() -> None:
@@ -354,7 +402,7 @@ def test_solo_owner_attestation_is_bound_to_current_head() -> None:
         def issue_comments(self, number: int) -> list[dict[str, object]]:
             return [
                 {
-                    "body": f"/verify SOLO PASS {sha} EVIDENCE codex://thread/123",
+                    "body": f"/verify SOLO PASS {sha} EVIDENCE {SOLO_EVIDENCE}",
                     "author_association": "OWNER",
                     "user": {"login": "owner"},
                 }
@@ -382,7 +430,7 @@ def test_solo_owner_attestation_cannot_be_recorded_by_a_bot() -> None:
         def issue_comments(self, number: int) -> list[dict[str, object]]:
             return [
                 {
-                    "body": f"/verify SOLO PASS {sha} EVIDENCE codex://thread/123",
+                    "body": f"/verify SOLO PASS {sha} EVIDENCE {SOLO_EVIDENCE}",
                     "author_association": "OWNER",
                     "user": {"login": "owner[bot]", "type": "Bot"},
                 }
@@ -531,6 +579,23 @@ def test_acceptance_refuses_invalid_current_pull_request() -> None:
     assert client.statuses == [("a" * 40, "failure", "治理检查失败")]
 
 
+def test_code_task_manual_closed_transition_is_rejected() -> None:
+    class AcceptedClient(FakeTransitionClient):
+        def issue(self, number: int) -> dict[str, object]:
+            issue = super().issue(number)
+            issue["labels"] = [{"name": "status:accepted"}]
+            return issue
+
+    client = AcceptedClient()
+    event = {
+        "issue": {"number": 9},
+        "comment": {"body": "/transition CLOSED", "author_association": "OWNER"},
+    }
+
+    assert handle_transition(event, client) == 1
+    assert client.statuses == [("a" * 40, "failure", "治理检查失败")]
+
+
 def test_review_verification_requires_trusted_independent_reviewer() -> None:
     class ReviewClient:
         def issue_comments(self, number: int) -> list[dict[str, object]]:
@@ -631,7 +696,169 @@ def test_closed_issue_label_cannot_skip_merge_gate() -> None:
     assert handle_issue_closed(event, client) == 1
 
 
-def test_merged_pull_request_close_event_finishes_rework_issue() -> None:
+class FakeClosedPullRequestClient:
+    def __init__(
+        self,
+        *,
+        issue_status: str = "ACCEPTED",
+        verification_sha: str | None = "a" * 40,
+        current_head: str = "a" * 40,
+        merged: bool = True,
+        merge_commit_sha: str | None = "c" * 40,
+        other_open: bool = False,
+    ) -> None:
+        self.issue_status = issue_status
+        self.verification_sha = verification_sha
+        self.current_head = current_head
+        self.merged = merged
+        self.merge_commit_sha = merge_commit_sha
+        self.other_open = other_open
+        self.updates: list[dict[str, object]] = []
+        self.comments: list[str] = []
+
+    def issue(self, number: int) -> dict[str, object]:
+        assert number == 9
+        return {
+            "number": 9,
+            "body": READY_BODY,
+            "labels": [{"name": f"status:{self.issue_status.lower().replace('_', '-')}"}],
+            "assignees": [{"login": "owner"}],
+        }
+
+    def pull_requests(self) -> list[dict[str, object]]:
+        pulls = [
+            {
+                "number": 10,
+                "state": "closed",
+                "body": PR_EVENT["pull_request"]["body"],
+                "head": {"sha": self.current_head},
+                "user": {"login": "implementer"},
+            }
+        ]
+        if self.other_open:
+            pulls.append(
+                {
+                    "number": 11,
+                    "state": "open",
+                    "body": PR_EVENT["pull_request"]["body"],
+                    "head": {"sha": "b" * 40},
+                    "user": {"login": "implementer"},
+                }
+            )
+        return pulls
+
+    def issue_comments(self, number: int) -> list[dict[str, object]]:
+        if self.verification_sha is None:
+            return []
+        return [
+            {
+                "body": f"/verify PASS {self.verification_sha}",
+                "author_association": "MEMBER",
+                "user": {"login": "verifier"},
+            }
+        ]
+
+    def pull_request_reviews(self, number: int) -> list[dict[str, object]]:
+        return []
+
+    def pull_request_commits(self, number: int) -> list[dict[str, object]]:
+        return [{"committer": {"login": "implementer"}}]
+
+    def update_issue(self, number: int, **changes: object) -> None:
+        assert number == 9
+        self.updates.append(changes)
+
+    def comment(self, number: int, body: str) -> None:
+        assert number == 9
+        self.comments.append(body)
+
+
+def _closed_pull_request_event(
+    client: FakeClosedPullRequestClient,
+) -> dict[str, object]:
+    return {
+        "action": "closed",
+        "pull_request": {
+            **PR_EVENT["pull_request"],
+            "number": 10,
+            "head": {"sha": client.current_head},
+            "merged": client.merged,
+            "merge_commit_sha": client.merge_commit_sha,
+        },
+    }
+
+
+def test_exact_merged_pull_request_close_event_closes_accepted_issue() -> None:
+    client = FakeClosedPullRequestClient()
+
+    assert handle_pull_request(_closed_pull_request_event(client), client) == 0
+    assert client.updates == [
+        {"labels": ["status:closed"], "state": "closed"}
+    ]
+    assert client.comments == [
+        "<!-- governance-audit: closed-by-pr PR 10 HEAD "
+        + "a" * 40
+        + " MERGE "
+        + "c" * 40
+        + " -->"
+    ]
+
+
+def test_issue_closed_accepts_only_pull_request_close_audit() -> None:
+    class AuthorizedCloseClient(FakeClosedPullRequestClient):
+        def issue(self, number: int) -> dict[str, object]:
+            issue = super().issue(number)
+            issue["labels"] = [{"name": "status:closed"}]
+            return issue
+
+        def issue_comments(self, number: int) -> list[dict[str, object]]:
+            return [
+                {
+                    "body": "<!-- governance-audit: closed-by-pr PR 10 HEAD "
+                    + "a" * 40
+                    + " MERGE "
+                    + "c" * 40
+                    + " -->",
+                    "user": {"login": "github-actions[bot]"},
+                }
+            ]
+
+    client = AuthorizedCloseClient()
+
+    assert handle_issue_closed({"issue": {"number": 9}}, client) == 0
+    assert client.updates == []
+
+
+def test_old_merged_pull_request_cannot_close_issue_with_new_open_pull_request() -> None:
+    client = FakeClosedPullRequestClient(other_open=True)
+
+    assert handle_pull_request(_closed_pull_request_event(client), client) == 1
+    assert client.updates == []
+
+
+def test_closed_pull_request_close_gate_rejects_invalid_events() -> None:
+    cases = (
+        {"current_head": "b" * 40},
+        {"verification_sha": None},
+        {"merge_commit_sha": None},
+        {"other_open": True},
+        {"issue_status": "READY_FOR_VERIFY"},
+    )
+
+    for options in cases:
+        client = FakeClosedPullRequestClient(**options)
+        assert handle_pull_request(_closed_pull_request_event(client), client) == 1
+        assert client.updates == []
+
+
+def test_unmerged_closed_pull_request_does_not_change_issue() -> None:
+    client = FakeClosedPullRequestClient(merged=False)
+
+    assert handle_pull_request(_closed_pull_request_event(client), client) == 0
+    assert client.updates == []
+
+
+def test_historical_merged_pull_request_cannot_authorize_issue_close() -> None:
     class MergedReworkCloseClient(FakeTransitionClient):
         def __init__(self) -> None:
             super().__init__()
@@ -669,62 +896,8 @@ def test_merged_pull_request_close_event_finishes_rework_issue() -> None:
 
     client = MergedReworkCloseClient()
 
-    assert handle_issue_closed({"issue": {"number": 9}}, client) == 0
-    assert client.updates == [{"labels": ["status:closed"]}]
-    assert client.comments == ["<!-- governance-audit: state CLOSED -->"]
-
-
-def test_old_merged_pull_request_cannot_close_issue_with_new_open_pull_request() -> None:
-    class SupersededMergedCloseClient(FakeTransitionClient):
-        def __init__(self) -> None:
-            super().__init__()
-            self.updates: list[dict[str, object]] = []
-            self.comments: list[str] = []
-
-        def issue(self, number: int) -> dict[str, object]:
-            assert number == 9
-            return {
-                "number": 9,
-                "body": READY_BODY,
-                "labels": [{"name": "status:ready-for-verify"}],
-                "assignees": [{"login": "owner"}],
-            }
-
-        def pull_requests(self) -> list[dict[str, object]]:
-            return [
-                {
-                    "number": 10,
-                    "state": "closed",
-                    "body": self.pull_body,
-                    "head": {"sha": "a" * 40},
-                    "user": {"login": "owner"},
-                    "merged_at": "2026-09-17T05:00:00Z",
-                },
-                {
-                    "number": 11,
-                    "state": "open",
-                    "body": self.pull_body,
-                    "head": {"sha": "b" * 40},
-                    "user": {"login": "owner"},
-                    "merged_at": None,
-                },
-            ]
-
-        def update_issue(self, number: int, **changes: object) -> None:
-            assert number == 9
-            self.updates.append(changes)
-
-        def comment(self, number: int, body: str) -> None:
-            assert number == 9
-            self.comments.append(body)
-
-    client = SupersededMergedCloseClient()
-
     assert handle_issue_closed({"issue": {"number": 9}}, client) == 1
     assert client.updates == [{"state": "open"}]
-    assert client.comments == [
-        "治理门禁重新打开 Issue：\n- 非法状态流转：READY_FOR_VERIFY -> CLOSED"
-    ]
 
 
 def test_analysis_issue_can_close_with_a_close_conclusion() -> None:
@@ -781,3 +954,11 @@ def test_bootstrap_workflow_never_uses_pr_checker_when_base_has_none() -> None:
     assert "types: [created, edited, deleted]" in workflow
     assert "types: [submitted, edited, dismissed]" in workflow
     assert "issues: write" in workflow
+    assert (
+        "types: [opened, edited, synchronize, reopened, ready_for_review, "
+        "converted_to_draft, closed]"
+    ) in workflow
+    assert "startsWith(github.event.comment.body, '/verify ')" in workflow
+    assert "startsWith(github.event.comment.body, '/verify PASS ')" not in workflow
+    assert workflow.count("record-verification:") == 1
+    assert "record-solo-verification:" not in workflow
