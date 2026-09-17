@@ -3,12 +3,15 @@
 ## 工作流
 
 1. 策略、风控、核算、下单或运行配置变更先创建 Issue。
-2. 从 main 创建短生命周期分支。
-3. 小步提交，提交信息说明意图。
-4. 运行 ruff check . 与 pytest。
-5. 通过 Pull Request 合并；不要直接修改受保护的 main。
+2. 使用 Issue 评论 `/transition STATE` 推进状态；不要直接修改 `status:*` 标签。
+3. Issue 达到 `READY` 后，从 main 创建包含 Issue 编号的短生命周期分支。
+4. 小步提交，提交信息说明意图；开发阶段可以创建 Draft Pull Request。
+5. 运行 ruff check . 与 pytest。
+6. 独立验收后在 Issue 记录 `/verify PASS <完整 HEAD SHA>`，再进入 `ACCEPTED`；新提交会使旧验收失效。
+7. 通过 Pull Request 合并；不要直接修改受保护的 main。
 
 拼写修正、小型文档调整和 Dependabot 更新可以不建 Issue，但仍须通过 Pull Request。
+治理、安全、Actions 和运行规则变更不属于小型文档例外。
 
 ## Pull Request 要求
 

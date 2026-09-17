@@ -22,3 +22,29 @@ Automation may reject, pause, stop or reduce risk. It may never grant an L3 appr
 5. Runtime logs are evidence, not authority to change a running strategy.
 
 Contradictions fail closed and must be resolved by a new Pull Request.
+
+## Task lifecycle
+
+GitHub Issue is the formal task and state record. `docs/codex` may keep detailed thread ownership, commands, evidence and handoffs, but it does not override the Issue state.
+
+The supported lifecycle is:
+
+`DRAFT -> ANALYZING -> READY -> IN_PROGRESS -> READY_FOR_VERIFY -> ACCEPTED -> CLOSED`
+
+Verification failures use `REWORK -> IN_PROGRESS`. Missing facts, permissions or environment use `BLOCKED -> ANALYZING`. Request a transition by commenting `/transition STATE` on the Issue; direct edits to `status:*` labels are not a governed transition.
+
+The gate checks:
+
+- `READY`: goal, scope, excluded scope, acceptance criteria, risk and rollback exist.
+- `IN_PROGRESS`: the Issue has an assignee and an Issue-linked branch exists.
+- `READY_FOR_VERIFY`: an open linked Pull Request exists.
+- `ACCEPTED`: an independent approval or `/verify PASS <full-head-sha>` record matches the current Pull Request HEAD.
+- `CLOSED`: a code task has a merged Pull Request; an analysis-only task has a recorded close conclusion.
+
+Draft Pull Requests may be created during implementation. The `governance` commit status remains pending until the Issue reaches `ACCEPTED`; passing CI alone does not authorize merge or runtime execution.
+
+The first governance Pull Request is a bootstrap exception: when `main` has no trusted checker, its governance workflow fails closed and never uses the Pull Request's checker to create a success proof. Merge it only through the existing ordinary required checks. After merge, verify the workflow from `main`, enable `governance` as a required status, and record that repository setting change.
+
+After independent verification, a trusted collaborator records the exact reviewed commit with `/verify PASS <full-head-sha>`, then requests `/transition ACCEPTED`. A later commit makes the old verification stale and returns the governance status to pending.
+
+L0 spelling and small documentation fixes may omit an Issue, but still require a Pull Request and CI. Changes to governance, security, Actions or runtime rules are never L0.
