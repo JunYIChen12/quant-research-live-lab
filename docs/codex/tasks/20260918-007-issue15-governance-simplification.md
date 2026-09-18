@@ -9,15 +9,15 @@
 
 ## 实施结果
 
-- 变更分类由 PR 文件路径确定：L0 小文档、明确 L1 普通研究/测试路径；发布、验证、Dry-run、风控、配置、Actions、治理、安全和未知路径按 HIGH 处理。
-- L1 Draft PR 可在 Issue 仍为 `DRAFT`、`ANALYZING` 或 `READY` 时通过治理检查，并可在有责任人、分支和开放 PR 时直接进入 `IN_PROGRESS`。
+- 变更分类由 PR 文件路径确定：L0 小文档；L1 仅命中显式白名单。当前仓库没有已批准的普通 L1 路径，因此产品代码、对应测试、发布、验证、Dry-run、风控、配置、Actions、治理、安全、未知和混合路径按 HIGH 处理。
+- 紧凑状态能力仍仅对明确传入的 L1 风险类开放；实际 PR 文件必须先由显式白名单分类为 L1，HIGH/未知不能跳过 READY。
 - HIGH 变更仍拒绝跳过完整状态链；精确 HEAD、独立验收、后续提交失效、REWORK 和合并关闭逻辑保留。
 - `docs/codex` 不再逐阶段镜像 GitHub；已将 Issue #13/PR #14 合并关闭和 `main` 基线写入稳定事实。
 
 ## 红绿证据
 
-- 旧实现：新增测试在收集阶段失败，`ImportError: cannot import name 'classify_change_files'`。
-- 新实现：治理定向测试通过。
+- REWORK 红灯：旧实现将 `src/quant_lab/order_router.py`、`live_adapter.py`、`risk_engine.py`、对应 `tests/**` 和未知 `src/tests` 路径归为 L1，并允许未知 Draft PR 紧凑通过；新增测试结果为 `2 failed, 50 passed`。
+- REWORK 绿灯：删除 `src/quant_lab/**` 和 `tests/**` 宽泛判定，显式 L1 白名单当前为空；治理定向测试 `52 passed`。
 
 ## 未执行与限制
 

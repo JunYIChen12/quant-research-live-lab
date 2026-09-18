@@ -43,6 +43,8 @@ HIGH_RISK_FILES = frozenset(
         "tests/test_validation.py",
     }
 )
+# Keep this empty until a real ordinary module is reviewed and listed explicitly.
+EXPLICIT_L1_FILES = frozenset()
 ISSUE_CONTRACT_SECTIONS = ("目标", "范围", "不在范围", "验收标准", "风险与回滚")
 PR_SECTIONS = ("变更", "证据", "风险与回滚", "未验证事项", "独立验收")
 CLOSED_PR_AUDIT_RE = re.compile(
@@ -297,7 +299,7 @@ def classify_change_files(files: tuple[str, ...]) -> str:
     normalized = tuple(path.replace("\\", "/") for path in files)
     if any(path in HIGH_RISK_FILES or path.startswith(HIGH_RISK_PREFIXES) for path in normalized):
         return "HIGH"
-    if all(path.startswith(("src/quant_lab/", "tests/")) for path in normalized):
+    if all(path in EXPLICIT_L1_FILES for path in normalized):
         return "L1"
     return "HIGH"
 

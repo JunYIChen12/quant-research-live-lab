@@ -131,14 +131,27 @@ def test_l0_exception_only_allows_small_documentation_changes() -> None:
 
 
 def test_change_classification_is_explicit_and_fails_closed() -> None:
-    assert classify_change_files(("src/quant_lab/research.py", "tests/test_research.py")) == "L1"
+    high_risk_paths = (
+        "src/quant_lab/order_router.py",
+        "src/quant_lab/live_adapter.py",
+        "src/quant_lab/risk_engine.py",
+        "tests/test_order_router.py",
+        "tests/test_live_adapter.py",
+        "tests/test_risk_engine.py",
+        "src/quant_lab/future_module.py",
+        "tests/test_future_module.py",
+    )
+
+    assert all(classify_change_files((path,)) == "HIGH" for path in high_risk_paths)
+    assert classify_change_files(("src/quant_lab/release.py", "tests/test_release.py")) == "HIGH"
     assert classify_change_files(("docs/typo.md",)) == "L0"
     assert classify_change_files(("tools/governance.py",)) == "HIGH"
     assert classify_change_files(("tests/test_governance.py",)) == "HIGH"
     assert classify_change_files(("unknown.txt",)) == "HIGH"
+    assert classify_change_files(("src/quant_lab/order_router.py", "docs/typo.md")) == "HIGH"
 
 
-def test_low_risk_draft_pull_request_can_use_compact_status_path() -> None:
+def test_unknown_draft_pull_request_cannot_use_compact_status_path() -> None:
     context = PullRequestContext(
         body=PR_EVENT["pull_request"]["body"],
         draft=True,
@@ -147,7 +160,9 @@ def test_low_risk_draft_pull_request_can_use_compact_status_path() -> None:
         linked_issue_status="DRAFT",
     )
 
-    assert validate_pull_request(context) == []
+    assert validate_pull_request(context) == [
+        "Draft Pull Request 要求关联 Issue 为 IN_PROGRESS、READY_FOR_VERIFY 或 ACCEPTED"
+    ]
 
 
 def test_low_risk_issue_can_skip_analysis_and_ready_states() -> None:

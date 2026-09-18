@@ -6,7 +6,7 @@ PR #14 的产品代码、定向/全量测试、Ruff、CI 和 fail-closed 场景�
 
 ## 决定
 
-继续以 GitHub Issue/PR、CI、精确 Pull Request HEAD、diff/敏感信息检查和独立验收作为正式证据。治理脚本按 PR 文件路径做确定分类：L0 仅为现有小文档例外；L1 仅为明确的普通研究/数据处理代码及其普通测试；发布、验证、Dry-run、风控、配置、权限、安全、Actions、治理和任何未知或混合路径均按高风险处理。
+继续以 GitHub Issue/PR、CI、精确 Pull Request HEAD、diff/敏感信息检查和独立验收作为正式证据。治理脚本按 PR 文件路径做确定分类：L0 仅为现有小文档例外；L1 只能命中显式文件白名单。当前仓库没有已批准的普通 L1 代码路径，因此产品代码、对应测试、发布、验证、Dry-run、风控、配置、权限、安全、Actions、治理和任何未知或混合路径均按高风险处理；新增 L1 路径必须同时修改白名单和治理测试。
 
 L1 可从已确认 Issue/PR 直接进入 `IN_PROGRESS`，再经过 `READY_FOR_VERIFY -> ACCEPTED -> CLOSED`；高风险仍必须经过完整的 `DRAFT -> ANALYZING -> READY -> IN_PROGRESS` 链。两条路径都保留精确 HEAD 验收、后续提交失效、REWORK/BLOCKED 和合并关闭门禁。
 
@@ -22,4 +22,4 @@ L1 可从已确认 Issue/PR 直接进入 `IN_PROGRESS`，再经过 `READY_FOR_VE
 
 ## 验证
 
-治理测试覆盖 L0、L1 紧凑路径、未知路径高风险、完整状态链、精确 HEAD、验收失效和合并关闭；全量测试与 CI 继续作为合并前检查。
+治理测试覆盖 L0、显式 L1 紧凑状态能力、高风险/未知路径拒绝、完整状态链、精确 HEAD、验收失效和合并关闭；全量测试与 CI 继续作为合并前检查。

@@ -12,10 +12,12 @@ Git is the source of truth for rules, code, tests and approval history. Chat mes
 | L3 | Live strategy, capital, leverage, positions or loss limits | Yes | Live release |
 
 The governance checker derives the class from Pull Request paths. L0 is the existing
-small-documentation exception. L1 is limited to `src/quant_lab/**` and ordinary
-`tests/**` paths, excluding release, validation, Dry-run and risk-gate files. L2,
-L3, governance, security, Actions, configuration and every unknown or mixed path
-are high risk and fail closed.
+small-documentation exception. L1 uses only an explicit file allowlist; it does not
+infer risk from broad `src/` or `tests/` prefixes. This repository currently has no
+approved ordinary L1 path, so product files, their tests, unknown files and mixed
+paths classify as high risk and fail closed. A future L1 path must be listed in the
+checker and covered by governance tests before it can use the compact flow. L2, L3,
+governance, security, Actions and configuration remain high risk.
 
 Automation may reject, pause, stop or reduce risk. It may never grant an L3 approval or enlarge risk.
 
