@@ -16,6 +16,33 @@ STATE_PREFIX = "status:"
 TRUSTED_ASSOCIATIONS = frozenset({"OWNER", "MEMBER", "COLLABORATOR"})
 BOT_LOGIN = "github-actions[bot]"
 AUDIT_PREFIX = "<!-- governance-audit:"
+HIGH_RISK_PREFIXES = (
+    ".github/",
+    "config/",
+    "tools/",
+    "docs/adr/",
+    "docs/codex/",
+    "docs/governance/",
+    "docs/operations/",
+    "docs/runtime/",
+)
+HIGH_RISK_FILES = frozenset(
+    {
+        "AGENTS.md",
+        "CONTRIBUTING.md",
+        "SECURITY.md",
+        "pyproject.toml",
+        "src/quant_lab/dry_run.py",
+        "src/quant_lab/gates.py",
+        "src/quant_lab/release.py",
+        "src/quant_lab/validation.py",
+        "tests/test_dry_run_supervisor.py",
+        "tests/test_gates.py",
+        "tests/test_governance.py",
+        "tests/test_release.py",
+        "tests/test_validation.py",
+    }
+)
 ISSUE_CONTRACT_SECTIONS = ("目标", "范围", "不在范围", "验收标准", "风险与回滚")
 PR_SECTIONS = ("变更", "证据", "风险与回滚", "未验证事项", "独立验收")
 CLOSED_PR_AUDIT_RE = re.compile(
@@ -47,6 +74,7 @@ class TransitionContext:
     branch_exists: bool = False
     open_pull_request: bool = False
     independent_verification_passed: bool = False
+    risk_class: str | None = None
 
 
 @dataclass(frozen=True)
@@ -173,7 +201,12 @@ def validate_transition(
         and "type:analysis" in context.labels
         and "关闭结论" in markdown_sections(context.body)
     )
-    if target not in TRANSITIONS.get(current, set()) and not analysis_close:
+    compact_path = (
+        target == "IN_PROGRESS"
+        and current in {"DRAFT", "ANALYZING"}
+        and context.risk_class == "L1"
+    )
+    if target not in TRANSITIONS.get(current, set()) and not compact_path and not analysis_close:
         return [f"非法状态流转：{current or 'NONE'} -> {target}"]
 
     errors: list[str] = []
@@ -186,6 +219,8 @@ def validate_transition(
             errors.append("IN_PROGRESS 缺少责任人")
         if not context.branch_exists:
             errors.append("IN_PROGRESS 缺少任务分支")
+        if compact_path and not context.open_pull_request:
+            errors.append("紧凑路径缺少关联 Pull Request")
     elif target == "READY_FOR_VERIFY" and not context.open_pull_request:
         errors.append("READY_FOR_VERIFY 缺少关联 Pull Request")
     elif target == "ACCEPTED" and not context.independent_verification_passed:
@@ -210,13 +245,18 @@ def validate_pull_request(context: PullRequestContext) -> list[str]:
         errors.append(f"Pull Request 缺少章节：{'、'.join(missing)}")
 
     status = (context.linked_issue_status or "").upper()
-    allowed = {"IN_PROGRESS", "READY_FOR_VERIFY", "ACCEPTED"} if context.draft else {
-        "READY_FOR_VERIFY",
-        "ACCEPTED",
-    }
+    risk_class = classify_change_files(context.changed_files)
+    if context.draft and risk_class == "L1":
+        allowed = {"DRAFT", "ANALYZING", "READY", "IN_PROGRESS", "READY_FOR_VERIFY", "ACCEPTED"}
+    elif context.draft:
+        allowed = {"IN_PROGRESS", "READY_FOR_VERIFY", "ACCEPTED"}
+    else:
+        allowed = {"READY_FOR_VERIFY", "ACCEPTED"}
     if status not in allowed:
         kind = "Draft" if context.draft else "非 Draft"
-        expected = "IN_PROGRESS、READY_FOR_VERIFY 或 ACCEPTED" if context.draft else (
+        expected = "DRAFT、ANALYZING、READY、IN_PROGRESS、READY_FOR_VERIFY 或 ACCEPTED" if (
+            context.draft and risk_class == "L1"
+        ) else "IN_PROGRESS、READY_FOR_VERIFY 或 ACCEPTED" if context.draft else (
             "READY_FOR_VERIFY 或 ACCEPTED"
         )
         errors.append(f"{kind} Pull Request 要求关联 Issue 为 {expected}")
@@ -246,6 +286,20 @@ def _is_small_documentation_change(files: tuple[str, ...]) -> bool:
         and path not in protected_files
         for path in files
     )
+
+
+def classify_change_files(files: tuple[str, ...]) -> str:
+    """Classify only explicit low-risk paths; everything else fails closed."""
+    if not files:
+        return "HIGH"
+    if _is_small_documentation_change(files):
+        return "L0"
+    normalized = tuple(path.replace("\\", "/") for path in files)
+    if any(path in HIGH_RISK_FILES or path.startswith(HIGH_RISK_PREFIXES) for path in normalized):
+        return "HIGH"
+    if all(path.startswith(("src/quant_lab/", "tests/")) for path in normalized):
+        return "L1"
+    return "HIGH"
 
 
 class GitHubClient:
@@ -456,6 +510,9 @@ def _transition_context(
     issue_number = issue["number"]
     pulls = _related_pull_requests(client, issue_number)
     open_pulls = [pull for pull in pulls if pull["state"] == "open"]
+    risk_class = None
+    if len(open_pulls) == 1:
+        risk_class = classify_change_files(client.pull_request_files(open_pulls[0]["number"]))
     verification_passed = bool(
         target_state == "ACCEPTED"
         and len(open_pulls) == 1
@@ -470,6 +527,7 @@ def _transition_context(
         ),
         open_pull_request=bool(open_pulls),
         independent_verification_passed=verification_passed,
+        risk_class=risk_class,
     )
 
 

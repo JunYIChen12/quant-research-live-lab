@@ -8,6 +8,7 @@ from tools.governance import (
     _manual_label_change_detected,
     _valid_evidence_reference,
     _verification_passed,
+    classify_change_files,
     extract_linked_issue,
     handle_issue_closed,
     handle_issue_label_change,
@@ -127,6 +128,65 @@ def test_l0_exception_only_allows_small_documentation_changes() -> None:
 
     assert validate_pull_request(allowed) == []
     assert validate_pull_request(denied) == ["L0 例外包含非小型文档变更"]
+
+
+def test_change_classification_is_explicit_and_fails_closed() -> None:
+    assert classify_change_files(("src/quant_lab/research.py", "tests/test_research.py")) == "L1"
+    assert classify_change_files(("docs/typo.md",)) == "L0"
+    assert classify_change_files(("tools/governance.py",)) == "HIGH"
+    assert classify_change_files(("tests/test_governance.py",)) == "HIGH"
+    assert classify_change_files(("unknown.txt",)) == "HIGH"
+
+
+def test_low_risk_draft_pull_request_can_use_compact_status_path() -> None:
+    context = PullRequestContext(
+        body=PR_EVENT["pull_request"]["body"],
+        draft=True,
+        changed_files=("src/quant_lab/research.py",),
+        linked_issue_number=9,
+        linked_issue_status="DRAFT",
+    )
+
+    assert validate_pull_request(context) == []
+
+
+def test_low_risk_issue_can_skip_analysis_and_ready_states() -> None:
+    context = TransitionContext(
+        body=READY_BODY,
+        assignees=("owner",),
+        branch_exists=True,
+        open_pull_request=True,
+        risk_class="L1",
+    )
+
+    assert validate_transition("DRAFT", "IN_PROGRESS", context) == []
+
+
+def test_low_risk_compact_path_requires_an_open_pull_request() -> None:
+    context = TransitionContext(
+        body=READY_BODY,
+        assignees=("owner",),
+        branch_exists=True,
+        risk_class="L1",
+    )
+
+    assert validate_transition("DRAFT", "IN_PROGRESS", context) == [
+        "紧凑路径缺少关联 Pull Request"
+    ]
+
+
+def test_high_risk_issue_cannot_use_compact_status_path() -> None:
+    context = TransitionContext(
+        body=READY_BODY,
+        assignees=("owner",),
+        branch_exists=True,
+        open_pull_request=True,
+        risk_class="HIGH",
+    )
+
+    assert validate_transition("DRAFT", "IN_PROGRESS", context) == [
+        "非法状态流转：DRAFT -> IN_PROGRESS"
+    ]
 
 
 def test_transition_command_is_exact_and_case_insensitive() -> None:
