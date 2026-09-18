@@ -11,6 +11,10 @@ These rules apply to all automated agents and contributors.
 7. Never claim profitability from in-sample results or a small number of live trades.
 8. Do not add live exchange adapters until a separate reviewed milestone explicitly authorizes them.
 
+## Codex Workflow
+
+Start with [WORKFLOW.md](docs/codex/WORKFLOW.md), [PROJECT_STATE.md](docs/codex/PROJECT_STATE.md), [TASKS.md](docs/codex/TASKS.md), and [CURRENT_TASK.md](docs/codex/CURRENT_TASK.md), then read the referenced task and unabsorbed migration records. Verify cwd, branch, HEAD, and existing changes before acting. Keep cross-thread facts and evidence in the repository. Follow the single-writer and independent-verification gates; never skip READY. These workflow records do not replace the safety rules above or the existing contribution and release policies.
+
 ## GitHub task governance
 
 - GitHub Issue is the formal task state source; local task notes are execution evidence.

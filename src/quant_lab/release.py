@@ -42,6 +42,8 @@ class ReleaseManifest:
     strategy: ArtifactDigest
     risk_config: ArtifactDigest
     evidence_bundle: ArtifactDigest
+    runtime_config: ArtifactDigest | None = None
+    validation_report: ArtifactDigest | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,6 +75,16 @@ def load_manifest(path: Path) -> ReleaseManifest:
         strategy=_artifact(artifacts["strategy"]),
         risk_config=_artifact(artifacts["risk_config"]),
         evidence_bundle=_artifact(artifacts["evidence_bundle"]),
+        runtime_config=(
+            _artifact(artifacts["runtime_config"])
+            if "runtime_config" in artifacts
+            else None
+        ),
+        validation_report=(
+            _artifact(artifacts["validation_report"])
+            if "validation_report" in artifacts
+            else None
+        ),
     )
 
 
@@ -143,11 +155,15 @@ def verify_release(
         elif manifest_hashes[0] != _sha256(manifest_path):
             violations.append("manifest_hash_mismatch")
 
-    named_artifacts = (
+    named_artifacts = [
         ("strategy", manifest.strategy),
         ("risk_config", manifest.risk_config),
         ("evidence_bundle", manifest.evidence_bundle),
-    )
+    ]
+    if manifest.runtime_config is not None:
+        named_artifacts.append(("runtime_config", manifest.runtime_config))
+    if manifest.validation_report is not None:
+        named_artifacts.append(("validation_report", manifest.validation_report))
     if len({artifact.path for _, artifact in named_artifacts}) != len(named_artifacts):
         violations.append("artifact_paths_not_unique")
 
