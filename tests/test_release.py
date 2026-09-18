@@ -139,6 +139,74 @@ def test_manifest_and_artifact_tampering_after_tag_is_rejected(tmp_path: Path) -
     assert "manifest_hash_mismatch" in result.violations
 
 
+def test_runtime_config_artifact_tampering_is_rejected(tmp_path: Path) -> None:
+    repository, artifacts, manifest, _ = _release_fixture(tmp_path)
+    runtime_config = artifacts / "runtime.json"
+    runtime_config.write_text('{"dry_run": true}\n', encoding="utf-8")
+    manifest.write_text(
+        manifest.read_text(encoding="utf-8").replace(
+            "[artifacts.evidence_bundle]",
+            "\n".join(
+                [
+                    "[artifacts.runtime_config]",
+                    'path = "runtime.json"',
+                    f'sha256 = "{_sha256(runtime_config)}"',
+                    "",
+                    "[artifacts.evidence_bundle]",
+                ]
+            ),
+        ),
+        encoding="utf-8",
+    )
+    runtime_config.write_text('{"dry_run": false}\n', encoding="utf-8")
+
+    result = verify_release(
+        repository_root=repository,
+        artifact_root=artifacts,
+        manifest_path=manifest,
+        requested_mode="dry-run",
+        expected_repository="JunYIChen12/quant-research-live-lab",
+        approval_verifier=lambda _: True,
+    )
+
+    assert result.allowed is False
+    assert "runtime_config_hash_mismatch" in result.violations
+
+
+def test_validation_report_artifact_tampering_is_rejected(tmp_path: Path) -> None:
+    repository, artifacts, manifest, _ = _release_fixture(tmp_path)
+    validation_report = artifacts / "validation-report.json"
+    validation_report.write_text('{"candidate_id": "candidate-v0.1.0"}\n', encoding="utf-8")
+    manifest.write_text(
+        manifest.read_text(encoding="utf-8").replace(
+            "[artifacts.evidence_bundle]",
+            "\n".join(
+                [
+                    "[artifacts.validation_report]",
+                    'path = "validation-report.json"',
+                    f'sha256 = "{_sha256(validation_report)}"',
+                    "",
+                    "[artifacts.evidence_bundle]",
+                ]
+            ),
+        ),
+        encoding="utf-8",
+    )
+    validation_report.write_text('{"candidate_id": "tampered"}\n', encoding="utf-8")
+
+    result = verify_release(
+        repository_root=repository,
+        artifact_root=artifacts,
+        manifest_path=manifest,
+        requested_mode="dry-run",
+        expected_repository="JunYIChen12/quant-research-live-lab",
+        approval_verifier=lambda _: True,
+    )
+
+    assert result.allowed is False
+    assert "validation_report_hash_mismatch" in result.violations
+
+
 def test_missing_real_approval_verifier_is_rejected(tmp_path: Path) -> None:
     repository, artifacts, manifest, _ = _release_fixture(tmp_path)
 
