@@ -26,7 +26,7 @@
 
 ## 未确认与限制
 
-2026-09-18 独立验收使用 Python 3.12.10、项目 `.venv`、Freqtrade 2026.8 和开发依赖；全量 pytest 为 `46 passed`，Ruff、pip check、compileall、`git diff --check` 均通过。该证据只覆盖本地验收基线，不代表远程 CI、持续运行、真实交易或现场状态。
+2026-09-18 独立验收使用 Python 3.12.10、项目 `.venv`、Freqtrade 2026.8 和开发依赖；测试数量与命令输出属于对应任务和 PR 的历史证据，不在稳定项目状态中维护。历史本地验收与当前 PR #14 精确 HEAD 的证据位置分别见 `tasks/20260917-005-single-dry-run-analysis.md`、`tasks/20260918-006-accepted-baseline-integration.md` 及 PR #14 评论；这些证据不代表远程 CI、持续运行、真实交易或现场状态。
 
 Playwright Python/Node 包不可用，未完成视觉验收。未启动正式 Dry-run 或交易服务，未连接交易所，未下载行情，未读取真实凭据或账户导出；不验证或授权实盘，也不能据此推断盈利。
 

@@ -133,23 +133,43 @@
 - 已语义合并 `AGENTS.md`、`CHANGELOG.md`、`README.md`；三者需人工 diff 复核，不适用直接 hash 一致条件。
 - 当前允许范围仍仅限任务契约中的白名单和三处语义合并文件；Draft PR #14 已创建，状态同步为 `READY_FOR_VERIFY`。
 
-### 直接迁移源 SHA-256 与核对结果
+### 直接迁移内容核对（可重跑）
 
-复制前记录的源文件 SHA-256；复制后 20 个未更新的直接迁移文件逐项一致，4 个状态文档按任务契约同步为 `IN_PROGRESS`：
+不再维护人工抄写的 SHA-256 表。以下命令从原始只读工作区和当前目标工作树读取同一组 20 个直接迁移文件，自动比较内容；四个状态文档和三处语义合并文件是明确例外：
 
-| 文件 | SHA-256 |
-| --- | --- |
-| `src/quant_lab/release.py` | `7483a42ec91e6cb9999765bc005ebf6530ef0c7814613afc72b324a3e4989526` |
-| `src/quant_lab/validation.py` | `9814192deb7e8db1b1c7f6ece7814ced9075a6d8dcd20241043c516736cd6522` |
-| `src/quant_lab/dry_run.py` | `44ec4adde07466eb531d5619134533089d120862b32b8829c887a8ace5d6ca6` |
-| `tests/test_release.py` | `5a37dfbaf0b7ce23df98cebed2f33f1913d696597dfe3012b3c2c13e90bbb91` |
-| `tests/test_validation.py` | `8808e6d15401e470432fc48b119988c1505ee9f91d590f4e04c595880df663b4` |
-| `tests/test_dry_run_supervisor.py` | `3326378af54fdc67e887472560276b3dc507ed30af17a44358af481e640aa03` |
-| `tests/fixtures/validation_cli/CliCandidate.py` | `0db702e673b297b19b0f32d4d50d9a31b1b8cc8c0447012ad0c5b9699b349355` |
-| `tests/fixtures/validation_cli/freqtrade.json` | `9baaf0dc6dbba38f60b7aa6294aab8ab1a52175d6dd04a3ad1948f59a7df417de` |
-| `tests/fixtures/validation_cli/risk.toml` | `5280700034f23e191dfeefd24073cb12a4a2c7847a8931de580c61390157119` |
+```powershell
+$source = 'D:\CodexProjects\projects\quant-research-live-lab'
+$target = (git rev-parse --show-toplevel)
+$files = @(
+    'src/quant_lab/release.py', 'src/quant_lab/validation.py', 'src/quant_lab/dry_run.py',
+    'tests/test_release.py', 'tests/test_validation.py', 'tests/test_dry_run_supervisor.py',
+    'tests/fixtures/validation_cli/CliCandidate.py',
+    'tests/fixtures/validation_cli/freqtrade.json',
+    'tests/fixtures/validation_cli/risk.toml',
+    'docs/codex/WORKFLOW.md', 'docs/codex/decisions/README.md',
+    'docs/codex/migration/README.md', 'docs/codex/archive/README.md',
+    'docs/codex/tasks/20260912-001-workbench-init.md',
+    'docs/codex/tasks/20260912-002-mvp-scope.md',
+    'docs/codex/tasks/20260912-002-phase-1-framework.md',
+    'docs/codex/tasks/20260912-002-system-requirements.md',
+    'docs/codex/tasks/20260914-003-remote-git-governance.md',
+    'docs/codex/tasks/20260916-004-candidate-parallel-governance.md',
+    'docs/codex/tasks/20260917-005-single-dry-run-analysis.md'
+)
+$missing = @($files | Where-Object {
+    -not (Test-Path -LiteralPath (Join-Path $source $_)) -or
+    -not (Test-Path -LiteralPath (Join-Path $target $_))
+})
+if ($missing) { $missing | ForEach-Object { "MISSING $_" }; throw 'Source/target file missing' }
+$mismatch = @($files | Where-Object {
+    (Get-FileHash (Join-Path $source $_) -Algorithm SHA256).Hash -ne
+    (Get-FileHash (Join-Path $target $_) -Algorithm SHA256).Hash
+})
+if ($mismatch) { $mismatch | ForEach-Object { "MISMATCH $_" }; throw 'Source/target content differs' }
+"PASS: $($files.Count) direct-migration files match source/target content."
+```
 
-`docs/codex/` 下 11 个未更新 Markdown 文件的源/目标 SHA-256 逐项一致；`CURRENT_TASK.md`、`PROJECT_STATE.md`、`TASKS.md` 和本任务文件为状态更新例外。`AGENTS.md`、`CHANGELOG.md`、`README.md` 为语义合并例外，已人工复核。
+2026-09-18 返工前后复跑结果均为 `PASS: 20 direct-migration files match source/target content.`；状态文件按任务契约更新，语义合并文件按人工 diff 复核。
 
 ### 实施验证
 
@@ -159,3 +179,10 @@
 - Freqtrade `2026.8` 合成 `list-strategies`：输出 `CliCandidate`，退出码 `0`；未启动 Dry-run、未下载行情、未连接交易所。
 - 缺少 Freqtrade 可执行文件：退出码 `2`，结论 `evidence_insufficient`，六项检查均失败关闭，未执行交易命令；生成物已清理。
 - 本机回环 HTTP/DOM：`1 passed, 23 deselected`；Playwright Python/Node 不可用，视觉检查未执行。
+
+## 文档证据返工记录（2026-09-18）
+
+- 来源：独立验收在线绑定 PR #14 精确 HEAD `d0f1c5424bde5681a6e5e7ce3f3cf79e567bb608` 后，发现手抄来源 SHA-256 表存在 5 项不一致；实际源/目标内容相同，但表格不能作为可靠证据。另发现 `PROJECT_STATE.md` 的 `46 passed` 未标明为历史快照。
+- 本次只删除易漂移的哈希表，改为上述可重跑源/目标内容比较；稳定项目状态不再维护测试数量，并明确历史与当前 PR 证据位置。不修改产品代码、测试、GitHub 治理、安全/发布政策或真实运行环境。
+- 返工前 Issue #13 已进入 `IN_PROGRESS`；本次文档返工已完成，任务文件、`CURRENT_TASK.md` 与任务索引保持 `READY_FOR_VERIFY`，下一责任线程为新的独立验收线程。
+- 历史 `46 passed` 只属于 [20260917-005 任务记录](20260917-005-single-dry-run-analysis.md) 的第二次独立验收；PR #14 精确旧 HEAD 的 `93 passed`、CI 和独立验收证据属于本任务实施记录及 PR #14 评论。本文档返工未重跑与文档无关的 93 项产品测试，远程 CI 将对新 HEAD 重新运行。
