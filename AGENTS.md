@@ -13,13 +13,14 @@ These rules apply to all automated agents and contributors.
 
 ## Codex Workflow
 
-Start with [WORKFLOW.md](docs/codex/WORKFLOW.md), [PROJECT_STATE.md](docs/codex/PROJECT_STATE.md), [TASKS.md](docs/codex/TASKS.md), and [CURRENT_TASK.md](docs/codex/CURRENT_TASK.md), then read the referenced task and unabsorbed migration records. Verify cwd, branch, HEAD, and existing changes before acting. Keep cross-thread facts and evidence in the repository. Follow the single-writer and independent-verification gates; never skip READY. These workflow records do not replace the safety rules above or the existing contribution and release policies.
+Start with [WORKFLOW.md](docs/codex/WORKFLOW.md), [PROJECT_STATE.md](docs/codex/PROJECT_STATE.md), [TASKS.md](docs/codex/TASKS.md), and [CURRENT_TASK.md](docs/codex/CURRENT_TASK.md), then read the referenced task and unabsorbed migration records. Verify cwd, branch, HEAD, and existing changes before acting. Keep cross-thread facts and evidence in the repository. Follow the single-writer and independent-verification gates; high-risk or unknown changes must not skip READY, and only explicitly classified L1 changes may use the compact path. These workflow records do not replace the safety rules above or the existing contribution and release policies.
 
 ## GitHub task governance
 
 - GitHub Issue is the formal task state source; local task notes are execution evidence.
 - Non-L0 work requires one Issue with one primary objective, scope and acceptance criteria.
-- Request state changes with `/transition STATE`; do not skip `READY` or edit `status:*` labels directly.
+- Request state changes with `/transition STATE`; high-risk changes must not skip `READY`, while explicitly classified L1 changes may use the compact path; never edit `status:*` labels directly.
 - Bind independent verification to the exact Pull Request HEAD with `/verify PASS <full-head-sha>`.
 - A code task is not closed until its accepted Pull Request is merged into `main`.
 - Governance automation cannot grant Dry-run, live trading or risk expansion approval.
+- GitHub Issue/PR is the task state source; `docs/codex` keeps stable facts, long-term decisions and necessary handoffs rather than mirroring every GitHub transition.
