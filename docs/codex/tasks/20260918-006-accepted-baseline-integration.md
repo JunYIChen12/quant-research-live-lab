@@ -3,8 +3,8 @@
 ## 状态与责任
 
 - 创建日期：2026-09-18，Asia/Shanghai。
-- 状态：`IN_PROGRESS`。
-- 当前责任线程：`20｜实施｜20260918-006`。
+- 状态：`READY_FOR_VERIFY`。
+- 当前责任线程：`30｜验收｜20260918-006`。
 - 唯一根目录：`D:/CodexProjects/projects/quant-research-live-lab`。
 - 本地基线：分支 `codex/workbench-init`，HEAD `ba8738fe18289398a8c6713772416facddb5532d`。
 - 远程基线：`main` 为 `d524b1218746133410c409134749fe7058ddf3b2`。
@@ -124,14 +124,14 @@
 
 ## 下一步
 
-实施线程 `20｜实施｜20260918-006` 正在按上述隔离工作树和白名单执行；完成验证、提交推送和 Draft PR 后进入 `READY_FOR_VERIFY`。
+实施线程 `20｜实施｜20260918-006` 已完成验证、提交推送并创建 Draft PR #14；下一责任线程为独立验收线程。
 
 ## 实施记录（2026-09-18）
 
 - 已在隔离工作树从远程 `main` 建立 `codex/13-accepted-baseline-integration`；原始脏工作区未写入。
 - 已按白名单迁移 9 个产品/测试/fixture 文件与 `docs/codex` 下 15 个 Markdown 文件；20 个未更新文件源/目标 SHA-256 逐项一致，4 个状态文档按契约更新。
 - 已语义合并 `AGENTS.md`、`CHANGELOG.md`、`README.md`；三者需人工 diff 复核，不适用直接 hash 一致条件。
-- 当前允许范围仍仅限任务契约中的白名单和三处语义合并文件；状态同步为 `IN_PROGRESS`。
+- 当前允许范围仍仅限任务契约中的白名单和三处语义合并文件；Draft PR #14 已创建，状态同步为 `READY_FOR_VERIFY`。
 
 ### 直接迁移源 SHA-256 与核对结果
 

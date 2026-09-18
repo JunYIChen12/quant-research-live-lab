@@ -18,7 +18,7 @@
 ## 静态文档与配置声明
 
 - [README](../../README.md) 将项目定位为初始化阶段安全内核，未具备实盘条件；后续路线图不是已确认活动任务。
-- 当前活动任务为 `20260918-006 / IN_PROGRESS`，负责把已验收的候选验证和单正式 Dry-run 监督/Web 基线从受保护的本地脏工作区迁移到最新 `main` 的一个受治理 PR；实施分支为 `codex/13-accepted-baseline-integration`，基线 `d524b1218746133410c409134749fe7058ddf3b2`；详见[当前任务](CURRENT_TASK.md)。`20260916-004` 仍为 `DRAFT`，不自动启动。
+- 当前活动任务为 `20260918-006 / READY_FOR_VERIFY`，负责把已验收的候选验证和单正式 Dry-run 监督/Web 基线从受保护的本地脏工作区迁移到最新 `main` 的一个受治理 PR；实施分支为 `codex/13-accepted-baseline-integration`，Draft PR #14，基线 `d524b1218746133410c409134749fe7058ddf3b2`；详见[当前任务](CURRENT_TASK.md)。`20260916-004` 仍为 `DRAFT`，不自动启动。
 - [架构](../architecture.md) 描述研究、发布、执行、风控、审计的计划边界，不证明已全部实现。
 - [pyproject.toml](../../pyproject.toml) 声明 Python >=3.12、空生产依赖、开发依赖 pytest/ruff、hatchling 构建。
 - [.github/workflows/ci.yml](../../.github/workflows/ci.yml) 配置 Python 3.12，依次执行 python -m pip install -e '.[dev]'、ruff check .、pytest；本地独立验收另行执行了对应质量检查，不能替代远程 CI 状态。
