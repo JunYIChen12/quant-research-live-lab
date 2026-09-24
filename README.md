@@ -14,6 +14,14 @@
 项目起因和发展过程见 [PROJECT_HISTORY.md](PROJECT_HISTORY.md)，当前唯一工作目标见
 [NOW.md](NOW.md)。
 
+## 本地检查
+
+```powershell
+python -m pip install "freqtrade==2026.8" "pytest>=8.3,<9" "ruff>=0.9,<1"
+ruff check .
+python -m pytest
+```
+
 ## 安全边界
 
 - 不提交交易所密钥、账户导出、原始行情或交易数据库。
