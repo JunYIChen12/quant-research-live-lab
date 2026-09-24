@@ -10,6 +10,7 @@
 - 基线策略：EMA50 与 EMA200 趋势交叉。
 - 当前结论：`RESEARCH_ONLY`。
 - 当前基线已完成固定结束日期验证并停止继续投入；新策略假设需另立任务批准。
+- Donchian 55/20 与 SMA200 趋势过滤均因最大回撤超过 25% 而淘汰，批次终态为 `EXHAUSTED`。
 
 项目起因和发展过程见 [PROJECT_HISTORY.md](PROJECT_HISTORY.md)，当前唯一工作目标见
 [NOW.md](NOW.md)。
